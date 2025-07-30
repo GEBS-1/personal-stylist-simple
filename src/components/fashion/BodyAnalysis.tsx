@@ -14,7 +14,8 @@ import {
   User,
   Loader2,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  ChevronRight
 } from "lucide-react";
 
 interface BodyMeasurements {
@@ -28,6 +29,10 @@ interface BodyMeasurements {
 
 type BodyType = 'apple' | 'pear' | 'hourglass' | 'rectangle' | 'inverted-triangle';
 
+interface BodyAnalysisProps {
+  onComplete?: (data: { bodyType: BodyType; measurements: BodyMeasurements }) => void;
+}
+
 const bodyTypeDescriptions = {
   apple: "Яблоко - полнота в области талии",
   pear: "Груша - узкие плечи, широкие бедра",
@@ -36,7 +41,7 @@ const bodyTypeDescriptions = {
   'inverted-triangle': "Перевернутый треугольник - широкие плечи"
 };
 
-export const BodyAnalysis = () => {
+export const BodyAnalysis = ({ onComplete }: BodyAnalysisProps) => {
   const [activeTab, setActiveTab] = useState<'photo' | 'manual'>('photo');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisComplete, setAnalysisComplete] = useState(false);
@@ -116,6 +121,9 @@ export const BodyAnalysis = () => {
         description: `Определен тип фигуры: ${bodyTypeDescriptions[detectedBodyType]}`,
       });
       
+      // Вызываем callback с данными анализа
+      onComplete?.({ bodyType: detectedBodyType, measurements: mockMeasurements });
+      
     } catch (error) {
       toast({
         title: "Ошибка анализа",
@@ -152,6 +160,9 @@ export const BodyAnalysis = () => {
       const detectedBodyType = analyzeBodyType(newMeasurements);
       setBodyType(detectedBodyType);
       setAnalysisComplete(true);
+      
+      // Вызываем callback с данными анализа
+      onComplete?.({ bodyType: detectedBodyType, measurements: newMeasurements });
     }
   }, [measurements, analyzeBodyType]);
 
@@ -406,6 +417,23 @@ export const BodyAnalysis = () => {
                   </>
                 )}
               </ul>
+            </div>
+
+            {/* Кнопка подтверждения и перехода */}
+            <div className="flex justify-center pt-4">
+              <Button 
+                onClick={() => {
+                  toast({
+                    title: "Данные подтверждены",
+                    description: "Переходим к настройке стилевых предпочтений",
+                  });
+                  onComplete?.({ bodyType, measurements });
+                }}
+                className="px-8"
+              >
+                Подтвердить данные и продолжить
+                <ChevronRight className="w-4 h-4 ml-2" />
+              </Button>
             </div>
           </CardContent>
         </Card>

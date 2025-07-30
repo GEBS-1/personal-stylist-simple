@@ -2,11 +2,18 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Palette, Shirt, DollarSign } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
+import { Palette, Shirt, DollarSign, ChevronRight } from "lucide-react";
 
-export const StylePreferences = () => {
+interface StylePreferencesProps {
+  analysisData?: any;
+  onComplete?: () => void;
+}
+
+export const StylePreferences = ({ analysisData, onComplete }: StylePreferencesProps) => {
   const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
+  const { toast } = useToast();
 
   const styles = ['Минимализм', 'Кэжуал', 'Классический', 'Бохо', 'Спортивный'];
   const colors = ['Нейтральные', 'Яркие', 'Пастельные', 'Темные', 'Принты'];
@@ -63,6 +70,34 @@ export const StylePreferences = () => {
                 </Badge>
               ))}
             </div>
+          </div>
+
+          {/* Информация об анализе фигуры */}
+          {analysisData && (
+            <div className="bg-muted/30 rounded-lg p-4">
+              <h4 className="font-medium mb-2">Ваш тип фигуры: {analysisData.bodyType}</h4>
+              <p className="text-sm text-muted-foreground">
+                Рекомендации учитывают особенности вашей фигуры
+              </p>
+            </div>
+          )}
+
+          {/* Кнопка продолжения */}
+          <div className="flex justify-center pt-4">
+            <Button 
+              onClick={() => {
+                toast({
+                  title: "Предпочтения сохранены",
+                  description: "Переходим к генерации образов",
+                });
+                onComplete?.();
+              }}
+              disabled={selectedStyles.length === 0 || selectedColors.length === 0}
+              className="px-8"
+            >
+              Продолжить к генерации образов
+              <ChevronRight className="w-4 h-4 ml-2" />
+            </Button>
           </div>
         </CardContent>
       </Card>

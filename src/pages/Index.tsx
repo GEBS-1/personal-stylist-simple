@@ -19,8 +19,39 @@ import { StylePreferences } from "@/components/fashion/StylePreferences";
 import { OutfitGenerator } from "@/components/fashion/OutfitGenerator";
 import { ProductCatalog } from "@/components/fashion/ProductCatalog";
 
+interface AnalysisData {
+  bodyType: string;
+  measurements: any;
+}
+
 const Index = () => {
   const [activeStep, setActiveStep] = useState<'analysis' | 'preferences' | 'outfits' | 'catalog'>('analysis');
+  const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
+  const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
+
+  const handleStepComplete = (stepId: string, data?: any) => {
+    setCompletedSteps(prev => new Set([...prev, stepId]));
+    
+    if (stepId === 'analysis' && data) {
+      setAnalysisData(data);
+      setActiveStep('preferences');
+    } else if (stepId === 'preferences') {
+      setActiveStep('outfits');
+    } else if (stepId === 'outfits') {
+      setActiveStep('catalog');
+    }
+  };
+
+  const handleStartAnalysis = () => {
+    setActiveStep('analysis');
+    // Прокрутить к разделу анализа
+    setTimeout(() => {
+      const analysisSection = document.querySelector('[value="analysis"]');
+      if (analysisSection) {
+        analysisSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
+  };
 
   const steps = [
     {
@@ -28,28 +59,28 @@ const Index = () => {
       title: 'Анализ фигуры',
       description: 'Определение типа фигуры и параметров',
       icon: Camera,
-      completed: false
+      completed: completedSteps.has('analysis')
     },
     {
       id: 'preferences',
       title: 'Стилевые предпочтения',
       description: 'Ваш стиль и цветовые предпочтения',
       icon: Palette,
-      completed: false
+      completed: completedSteps.has('preferences')
     },
     {
       id: 'outfits',
       title: 'Подбор образов',
       description: 'ИИ-генерация персональных луков',
       icon: Sparkles,
-      completed: false
+      completed: completedSteps.has('outfits')
     },
     {
       id: 'catalog',
       title: 'Каталог товаров',
       description: 'Рекомендуемые товары из маркетплейсов',
       icon: ShoppingBag,
-      completed: false
+      completed: completedSteps.has('catalog')
     }
   ];
 
@@ -81,7 +112,7 @@ const Index = () => {
           <Button 
             size="lg" 
             className="elegant-shadow"
-            onClick={() => setActiveStep('analysis')}
+            onClick={handleStartAnalysis}
           >
             Начать стилизацию
             <ChevronRight className="w-5 h-5 ml-2" />
@@ -139,7 +170,7 @@ const Index = () => {
                   Загрузите фото или введите параметры вручную для определения типа фигуры
                 </p>
               </div>
-              <BodyAnalysis />
+              <BodyAnalysis onComplete={(data) => handleStepComplete('analysis', data)} />
             </TabsContent>
 
             <TabsContent value="preferences" className="space-y-8">
@@ -149,7 +180,10 @@ const Index = () => {
                   Расскажите о ваших предпочтениях в стиле, цветах и бюджете
                 </p>
               </div>
-              <StylePreferences />
+              <StylePreferences 
+                analysisData={analysisData}
+                onComplete={() => handleStepComplete('preferences')} 
+              />
             </TabsContent>
 
             <TabsContent value="outfits" className="space-y-8">
@@ -159,7 +193,10 @@ const Index = () => {
                   ИИ создаст персональные образы на основе ваших данных
                 </p>
               </div>
-              <OutfitGenerator />
+              <OutfitGenerator 
+                analysisData={analysisData}
+                onComplete={() => handleStepComplete('outfits')} 
+              />
             </TabsContent>
 
             <TabsContent value="catalog" className="space-y-8">
@@ -169,7 +206,7 @@ const Index = () => {
                   Рекомендуемые товары из Ozon, Wildberries и Lamoda
                 </p>
               </div>
-              <ProductCatalog />
+              <ProductCatalog analysisData={analysisData} />
             </TabsContent>
           </Tabs>
         </div>
