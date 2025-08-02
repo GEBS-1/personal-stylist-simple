@@ -17,6 +17,7 @@ import {
   AlertCircle,
   ChevronRight
 } from "lucide-react";
+import { PhotoAnalyzer } from "./PhotoAnalyzer";
 
 interface BodyMeasurements {
   height: number;
@@ -31,6 +32,8 @@ type BodyType = 'apple' | 'pear' | 'hourglass' | 'rectangle' | 'inverted-triangl
 
 interface BodyAnalysisProps {
   onComplete?: (data: { bodyType: BodyType; measurements: BodyMeasurements }) => void;
+  onContinue?: () => void;
+  analysisData?: any;
 }
 
 const bodyTypeDescriptions = {
@@ -41,20 +44,21 @@ const bodyTypeDescriptions = {
   'inverted-triangle': "Перевернутый треугольник - широкие плечи"
 };
 
-export const BodyAnalysis = ({ onComplete }: BodyAnalysisProps) => {
+export const BodyAnalysis = ({ onComplete, onContinue, analysisData }: BodyAnalysisProps) => {
   const [activeTab, setActiveTab] = useState<'photo' | 'manual'>('photo');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisComplete, setAnalysisComplete] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [bodyType, setBodyType] = useState<BodyType | null>(null);
+  const [bodyType, setBodyType] = useState<BodyType | null>(analysisData?.bodyType || null);
   const [measurements, setMeasurements] = useState<BodyMeasurements>({
-    height: 0,
-    weight: 0,
-    chest: 0,
-    waist: 0,
-    hips: 0,
-    shoulders: 0
+    height: analysisData?.measurements?.height || 0,
+    weight: analysisData?.measurements?.weight || 0,
+    chest: analysisData?.measurements?.chest || 0,
+    waist: analysisData?.measurements?.waist || 0,
+    hips: analysisData?.measurements?.hips || 0,
+    shoulders: analysisData?.measurements?.shoulders || 0
   });
+  const [isEditing, setIsEditing] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -181,76 +185,38 @@ export const BodyAnalysis = ({ onComplete }: BodyAnalysisProps) => {
         </TabsList>
 
         <TabsContent value="photo" className="space-y-6">
-          <Card className="glass-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Camera className="w-5 h-5" />
-                Анализ фото с помощью ИИ
-              </CardTitle>
-              <CardDescription>
-                Загрузите фото в полный рост для автоматического определения параметров фигуры
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {!isAnalyzing && !analysisComplete && (
-                <div 
-                  className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-12 text-center hover:border-primary/50 smooth-transition cursor-pointer"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="text-lg font-medium mb-2">Загрузить фото</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Поддерживаются форматы: JPG, PNG, WEBP
-                  </p>
-                  <Button>
-                    Выбрать файл
-                  </Button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileSelect}
-                    className="hidden"
-                  />
-                </div>
-              )}
-
-              {isAnalyzing && (
-                <div className="text-center space-y-4">
-                  <Loader2 className="w-12 h-12 mx-auto animate-spin text-primary" />
-                  <h3 className="text-lg font-medium">Анализируем фото...</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Определяем ключевые точки тела и рассчитываем параметры
-                  </p>
-                  <Progress value={uploadProgress} className="w-full max-w-md mx-auto" />
-                </div>
-              )}
-
-              {analysisComplete && (
-                <div className="text-center space-y-4">
-                  <CheckCircle className="w-12 h-12 mx-auto text-green-500" />
-                  <h3 className="text-lg font-medium">Анализ завершен</h3>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      setAnalysisComplete(false);
-                      setBodyType(null);
-                      setMeasurements({
-                        height: 0,
-                        weight: 0,
-                        chest: 0,
-                        waist: 0,
-                        hips: 0,
-                        shoulders: 0
-                      });
-                    }}
-                  >
-                    Загрузить другое фото
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <PhotoAnalyzer 
+            onAnalysisComplete={(measurements, bodyType, gender) => {
+              setMeasurements({
+                height: measurements.height,
+                weight: 0, // Вес не определяется по фото
+                chest: measurements.chest,
+                waist: measurements.waist,
+                hips: measurements.hips,
+                shoulders: measurements.shoulders
+              });
+              setBodyType(bodyType as BodyType);
+              setAnalysisComplete(true);
+              
+              // Показываем информацию о поле
+              if (gender && gender !== 'unknown') {
+                console.log(`👤 Определен пол: ${gender === 'male' ? 'мужской' : 'женский'}`);
+              }
+              
+              // Вызываем callback с результатами
+              onComplete?.({
+                bodyType: bodyType as BodyType,
+                measurements: {
+                  height: measurements.height,
+                  weight: 0,
+                  chest: measurements.chest,
+                  waist: measurements.waist,
+                  hips: measurements.hips,
+                  shoulders: measurements.shoulders
+                }
+              });
+            }}
+          />
         </TabsContent>
 
         <TabsContent value="manual" className="space-y-6">
@@ -267,26 +233,26 @@ export const BodyAnalysis = ({ onComplete }: BodyAnalysisProps) => {
             <CardContent className="space-y-6">
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="height">Рост (см)</Label>
-                    <Input
-                      id="height"
-                      type="number"
-                      placeholder="165"
-                      value={measurements.height || ''}
-                      onChange={(e) => handleMeasurementChange('height', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="weight">Вес (кг)</Label>
-                    <Input
-                      id="weight"
-                      type="number"
-                      placeholder="60"
-                      value={measurements.weight || ''}
-                      onChange={(e) => handleMeasurementChange('weight', e.target.value)}
-                    />
-                  </div>
+                                     <div>
+                     <Label htmlFor="height">Рост (см) *</Label>
+                     <Input
+                       id="height"
+                       type="number"
+                       placeholder="165"
+                       value={measurements.height || ''}
+                       onChange={(e) => handleMeasurementChange('height', e.target.value)}
+                     />
+                   </div>
+                   <div>
+                     <Label htmlFor="weight">Вес (кг) *</Label>
+                     <Input
+                       id="weight"
+                       type="number"
+                       placeholder="60"
+                       value={measurements.weight || ''}
+                       onChange={(e) => handleMeasurementChange('weight', e.target.value)}
+                     />
+                   </div>
                   <div>
                     <Label htmlFor="chest">Обхват груди (см)</Label>
                     <Input
@@ -328,16 +294,34 @@ export const BodyAnalysis = ({ onComplete }: BodyAnalysisProps) => {
                       value={measurements.shoulders || ''}
                       onChange={(e) => handleMeasurementChange('shoulders', e.target.value)}
                     />
-                  </div>
+                                     </div>
+                 </div>
+               </div>
+                               <p className="text-sm text-muted-foreground">* Обязательные поля для определения типа фигуры</p>
+
+                {/* Кнопка продолжить для ручного ввода */}
+                <div className="flex justify-center pt-4">
+                  <Button
+                    onClick={() => {
+                      const detectedBodyType = analyzeBodyType(measurements);
+                      setBodyType(detectedBodyType);
+                      setAnalysisComplete(true);
+                      onComplete?.({ bodyType: detectedBodyType, measurements });
+                    }}
+                    disabled={measurements.height <= 0 || measurements.weight <= 0}
+                    className="px-8"
+                  >
+                    Продолжить
+                    <ChevronRight className="w-4 h-4 ml-2" />
+                  </Button>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+             </CardContent>
+           </Card>
         </TabsContent>
       </Tabs>
 
       {/* Результаты анализа */}
-      {bodyType && (
+      {bodyType && !isEditing && (
         <Card className="glass-card mt-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -419,8 +403,14 @@ export const BodyAnalysis = ({ onComplete }: BodyAnalysisProps) => {
               </ul>
             </div>
 
-            {/* Кнопка подтверждения и перехода */}
-            <div className="flex justify-center pt-4">
+            {/* Кнопки действий */}
+            <div className="flex justify-center gap-4 pt-4">
+              <Button 
+                variant="outline"
+                onClick={() => setIsEditing(true)}
+              >
+                Редактировать данные
+              </Button>
               <Button 
                 onClick={() => {
                   toast({
@@ -428,11 +418,112 @@ export const BodyAnalysis = ({ onComplete }: BodyAnalysisProps) => {
                     description: "Переходим к настройке стилевых предпочтений",
                   });
                   onComplete?.({ bodyType, measurements });
+                  onContinue?.();
                 }}
                 className="px-8"
               >
                 Подтвердить данные и продолжить
                 <ChevronRight className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Форма редактирования */}
+      {isEditing && (
+        <Card className="glass-card mt-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calculator className="w-5 h-5" />
+              Редактирование данных
+            </CardTitle>
+            <CardDescription>
+              Внесите изменения в параметры и нажмите "Сохранить"
+            </CardDescription>
+          </CardHeader>
+                     <CardContent className="space-y-6">
+             <div className="grid md:grid-cols-2 gap-4">
+               <div>
+                 <Label htmlFor="edit-height">Рост (см) *</Label>
+                 <Input
+                   id="edit-height"
+                   type="number"
+                   placeholder="170"
+                   value={measurements.height || ''}
+                   onChange={(e) => setMeasurements(prev => ({ ...prev, height: Number(e.target.value) }))}
+                 />
+               </div>
+               <div>
+                 <Label htmlFor="edit-weight">Вес (кг) *</Label>
+                 <Input
+                   id="edit-weight"
+                   type="number"
+                   placeholder="65"
+                   value={measurements.weight || ''}
+                   onChange={(e) => setMeasurements(prev => ({ ...prev, weight: Number(e.target.value) }))}
+                 />
+               </div>
+               <div>
+                 <Label htmlFor="edit-chest">Обхват груди (см)</Label>
+                 <Input
+                   id="edit-chest"
+                   type="number"
+                   placeholder="88"
+                   value={measurements.chest || ''}
+                   onChange={(e) => setMeasurements(prev => ({ ...prev, chest: Number(e.target.value) }))}
+                 />
+               </div>
+               <div>
+                 <Label htmlFor="edit-waist">Обхват талии (см)</Label>
+                 <Input
+                   id="edit-waist"
+                   type="number"
+                   placeholder="68"
+                   value={measurements.waist || ''}
+                   onChange={(e) => setMeasurements(prev => ({ ...prev, waist: Number(e.target.value) }))}
+                 />
+               </div>
+               <div>
+                 <Label htmlFor="edit-hips">Обхват бедер (см)</Label>
+                 <Input
+                   id="edit-hips"
+                   type="number"
+                   placeholder="92"
+                   value={measurements.hips || ''}
+                   onChange={(e) => setMeasurements(prev => ({ ...prev, hips: Number(e.target.value) }))}
+                 />
+               </div>
+               <div>
+                 <Label htmlFor="edit-shoulders">Ширина плеч (см)</Label>
+                 <Input
+                   id="edit-shoulders"
+                   type="number"
+                   placeholder="86"
+                   value={measurements.shoulders || ''}
+                   onChange={(e) => setMeasurements(prev => ({ ...prev, shoulders: Number(e.target.value) }))}
+                 />
+               </div>
+             </div>
+             <p className="text-sm text-muted-foreground">* Обязательные поля</p>
+
+            <div className="flex justify-center gap-4 pt-4">
+              <Button 
+                variant="outline"
+                onClick={() => {
+                  setIsEditing(false);
+                  // Пересчитываем тип фигуры при изменении данных
+                  const newBodyType = analyzeBodyType(measurements);
+                  setBodyType(newBodyType);
+                }}
+              >
+                Сохранить изменения
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => setIsEditing(false)}
+              >
+                Отмена
               </Button>
             </div>
           </CardContent>

@@ -34,7 +34,8 @@ const Index = () => {
     
     if (stepId === 'analysis' && data) {
       setAnalysisData(data);
-      setActiveStep('preferences');
+      // НЕ переходим автоматически к следующему шагу
+      // Пользователь сам решит, когда готов
     } else if (stepId === 'preferences') {
       setActiveStep('outfits');
     } else if (stepId === 'outfits') {
@@ -42,11 +43,21 @@ const Index = () => {
     }
   };
 
+  // Функция для перехода к следующему шагу после анализа
+  const handleContinueFromAnalysis = () => {
+    setActiveStep('preferences');
+  };
+
+  // Сохраняем данные при переходе между шагами
+  const handleStepChange = (step: 'analysis' | 'preferences' | 'outfits' | 'catalog') => {
+    setActiveStep(step);
+  };
+
   const handleStartAnalysis = () => {
     setActiveStep('analysis');
-    // Прокрутить к разделу анализа
+    // Прокрутить к разделу анализа фото
     setTimeout(() => {
-      const analysisSection = document.querySelector('[value="analysis"]');
+      const analysisSection = document.querySelector('[data-step="analysis"]');
       if (analysisSection) {
         analysisSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
@@ -131,13 +142,13 @@ const Index = () => {
                 const isCompleted = step.completed;
                 
                 return (
-                  <button
-                    key={step.id}
-                    onClick={() => setActiveStep(step.id as any)}
-                    className={`flex flex-col items-center space-y-2 min-w-0 smooth-transition ${
-                      isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
+                                     <button
+                     key={step.id}
+                     onClick={() => handleStepChange(step.id as any)}
+                     className={`flex flex-col items-center space-y-2 min-w-0 smooth-transition ${
+                       isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                     }`}
+                   >
                     <div className={`w-16 h-16 rounded-full border-2 flex items-center justify-center smooth-transition ${
                       isActive 
                         ? 'border-primary bg-primary text-primary-foreground' 
@@ -159,18 +170,24 @@ const Index = () => {
         </div>
       </section>
 
+      
+
       {/* Main Content */}
       <section className="py-12 px-6">
         <div className="max-w-7xl mx-auto">
           <Tabs value={activeStep} className="space-y-8">
-            <TabsContent value="analysis" className="space-y-8">
+            <TabsContent value="analysis" className="space-y-8" data-step="analysis">
               <div className="text-center mb-8">
                 <h2 className="font-display text-3xl font-bold mb-4">Анализ фигуры</h2>
                 <p className="text-muted-foreground max-w-2xl mx-auto">
                   Загрузите фото или введите параметры вручную для определения типа фигуры
                 </p>
               </div>
-              <BodyAnalysis onComplete={(data) => handleStepComplete('analysis', data)} />
+                                           <BodyAnalysis 
+                onComplete={(data) => handleStepComplete('analysis', data)}
+                onContinue={handleContinueFromAnalysis}
+                analysisData={analysisData}
+              />
             </TabsContent>
 
             <TabsContent value="preferences" className="space-y-8">

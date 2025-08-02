@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
-import { Sparkles, RefreshCw, ChevronRight } from "lucide-react";
+import { Sparkles, RefreshCw, ChevronRight, ShoppingBag, Palette, Star } from "lucide-react";
+import { aiService, OutfitRequest, GeneratedOutfit } from "@/services/aiService";
 
 interface OutfitGeneratorProps {
   analysisData?: any;
@@ -11,47 +12,62 @@ interface OutfitGeneratorProps {
 }
 
 export const OutfitGenerator = ({ analysisData, onComplete }: OutfitGeneratorProps) => {
-  const [generatedOutfits, setGeneratedOutfits] = useState<any[]>([]);
+  const [generatedOutfits, setGeneratedOutfits] = useState<GeneratedOutfit[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [selectedOccasion, setSelectedOccasion] = useState<string>('casual');
+  const [currentProvider, setCurrentProvider] = useState<string>('simulation');
   const { toast } = useToast();
 
+  useEffect(() => {
+    // Получаем текущий AI провайдер
+    setCurrentProvider(aiService.getCurrentProvider());
+  }, []);
+
   const generateOutfits = async () => {
+    if (!analysisData) return;
+    
     setIsGenerating(true);
     
-    // Симуляция генерации образов
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    const mockOutfits = [
-      {
-        id: 1,
-        title: "Деловой стиль",
-        description: "Элегантный образ для офиса",
-        items: ["Белая блузка", "Черные брюки", "Классические туфли"],
-        colors: ["white", "black"]
-      },
-      {
-        id: 2,
-        title: "Кэжуал",
-        description: "Комфортный повседневный образ",
-        items: ["Джинсы", "Базовая футболка", "Кроссовки"],
-        colors: ["blue", "white"]
-      },
-      {
-        id: 3,
-        title: "Вечерний образ",
-        description: "Стильный лук для особых случаев",
-        items: ["Маленькое черное платье", "Высокие каблуки", "Клатч"],
-        colors: ["black", "gold"]
+    try {
+      const request: OutfitRequest = {
+        bodyType: analysisData.bodyType,
+        measurements: {
+          height: analysisData.measurements.height,
+          chest: analysisData.measurements.chest,
+          waist: analysisData.measurements.waist,
+          hips: analysisData.measurements.hips,
+          shoulders: analysisData.measurements.shoulders
+        },
+        stylePreferences: ['Кэжуал', 'Классический'], // Можно получать из StylePreferences
+        colorPreferences: ['Нейтральные', 'Темные'], // Можно получать из StylePreferences
+        occasion: selectedOccasion,
+        season: 'all', // Можно определять по дате
+        budget: 'medium'
+      };
+
+      // Генерируем 3 образа с новым AI сервисом
+      const outfits: GeneratedOutfit[] = [];
+      for (let i = 0; i < 3; i++) {
+        const outfit = await aiService.generateOutfit(request);
+        outfits.push(outfit);
       }
-    ];
-    
-    setGeneratedOutfits(mockOutfits);
-    setIsGenerating(false);
-    
-    toast({
-      title: "Образы сгенерированы",
-      description: "Созданы персональные луки на основе вашего типа фигуры",
-    });
+      setGeneratedOutfits(outfits);
+      
+      toast({
+        title: "Образы сгенерированы",
+        description: `Создано ${outfits.length} персональных луков`,
+      });
+      
+      onComplete?.();
+    } catch (error) {
+      toast({
+        title: "Ошибка генерации",
+        description: "Не удалось создать образы. Попробуйте еще раз.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -66,13 +82,41 @@ export const OutfitGenerator = ({ analysisData, onComplete }: OutfitGeneratorPro
         <CardContent className="space-y-6">
           {analysisData && (
             <div className="bg-muted/30 rounded-lg p-4">
-              <h4 className="font-medium mb-2">Учитываем ваши данные:</h4>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-medium">Учитываем ваши данные:</h4>
+                <Badge variant="outline" className="text-xs">
+                  AI: {currentProvider === 'gemini' ? 'Google Gemini' : 
+                       currentProvider === 'openai' ? 'OpenAI GPT-4' : 
+                       currentProvider === 'claude' ? 'Anthropic Claude' : 
+                       currentProvider === 'cohere' ? 'Cohere' : 
+                       currentProvider === 'local' ? 'Локальная модель' : 'Симуляция'}
+                </Badge>
+              </div>
               <div className="flex gap-2">
                 <Badge variant="secondary">Тип фигуры: {analysisData.bodyType}</Badge>
                 <Badge variant="outline">Рост: {analysisData.measurements.height} см</Badge>
               </div>
             </div>
           )}
+
+          {/* Выбор повода */}
+          <div className="space-y-4">
+            <h4 className="font-medium">Выберите повод:</h4>
+            <div className="flex gap-2">
+              {['casual', 'business', 'evening'].map((occasion) => (
+                <Button
+                  key={occasion}
+                  variant={selectedOccasion === occasion ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedOccasion(occasion)}
+                >
+                  {occasion === 'casual' && 'Повседневный'}
+                  {occasion === 'business' && 'Деловой'}
+                  {occasion === 'evening' && 'Вечерний'}
+                </Button>
+              ))}
+            </div>
+          </div>
 
           {generatedOutfits.length === 0 ? (
             <div className="text-center py-12">
@@ -104,15 +148,70 @@ export const OutfitGenerator = ({ analysisData, onComplete }: OutfitGeneratorPro
               <div className="grid md:grid-cols-3 gap-6">
                 {generatedOutfits.map((outfit) => (
                   <Card key={outfit.id} className="hover:shadow-lg smooth-transition">
-                    <CardContent className="pt-6">
-                      <h3 className="font-medium mb-2">{outfit.title}</h3>
-                      <p className="text-sm text-muted-foreground mb-4">{outfit.description}</p>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <CardTitle className="text-lg">{outfit.name}</CardTitle>
+                          <p className="text-sm text-muted-foreground">{outfit.description}</p>
+                        </div>
+                        <Badge variant="secondary" className="text-xs">
+                          {(outfit.confidence * 100).toFixed(0)}%
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Предметы одежды */}
                       <div className="space-y-2">
-                        {outfit.items.map((item: string, index: number) => (
-                          <div key={index} className="text-sm bg-muted/50 rounded px-2 py-1">
-                            {item}
+                        <h5 className="font-medium text-sm flex items-center gap-2">
+                          <ShoppingBag className="w-4 h-4" />
+                          Предметы одежды
+                        </h5>
+                        {outfit.items.map((item, index) => (
+                          <div key={index} className="text-sm bg-muted/50 rounded-lg p-3">
+                            <div className="font-medium">{item.category}</div>
+                            <div className="text-muted-foreground">{item.description}</div>
+                            <div className="flex gap-2 mt-2">
+                              <Badge variant="outline" className="text-xs">
+                                {item.style}
+                              </Badge>
+                              <Badge variant="outline" className="text-xs">
+                                {item.price} ₽
+                              </Badge>
+                            </div>
                           </div>
                         ))}
+                      </div>
+
+                      {/* Цветовая палитра */}
+                      <div className="space-y-2">
+                        <h5 className="font-medium text-sm flex items-center gap-2">
+                          <Palette className="w-4 h-4" />
+                          Цветовая палитра
+                        </h5>
+                        <div className="flex gap-2">
+                          {outfit.colorPalette.map((color, index) => (
+                            <Badge key={index} variant="secondary" className="text-xs">
+                              {color}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Стилевые заметки */}
+                      <div className="space-y-2">
+                        <h5 className="font-medium text-sm flex items-center gap-2">
+                          <Star className="w-4 h-4" />
+                          Рекомендации
+                        </h5>
+                        <p className="text-sm text-muted-foreground">{outfit.styleNotes}</p>
+                      </div>
+
+                      {/* Общая стоимость */}
+                      <div className="pt-2 border-t">
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium">Общая стоимость:</span>
+                          <span className="text-lg font-bold text-primary">{outfit.totalPrice}</span>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
