@@ -3,12 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
-import { Sparkles, RefreshCw, ChevronRight, ShoppingBag, Palette, Star } from "lucide-react";
+import { Sparkles, RefreshCw, ChevronRight, ShoppingBag, Palette, Star, User, Ruler, Scale } from "lucide-react";
 import { aiService, OutfitRequest, GeneratedOutfit } from "@/services/aiService";
+import { BodyData } from "./ManualBodyInput";
 
 interface OutfitGeneratorProps {
-  analysisData?: any;
-  onComplete?: () => void;
+  analysisData?: BodyData;
+  onComplete?: (outfit?: GeneratedOutfit) => void;
 }
 
 export const OutfitGenerator = ({ analysisData, onComplete }: OutfitGeneratorProps) => {
@@ -32,39 +33,58 @@ export const OutfitGenerator = ({ analysisData, onComplete }: OutfitGeneratorPro
       const request: OutfitRequest = {
         bodyType: analysisData.bodyType,
         measurements: {
-          height: analysisData.measurements.height,
-          chest: analysisData.measurements.chest,
-          waist: analysisData.measurements.waist,
-          hips: analysisData.measurements.hips,
-          shoulders: analysisData.measurements.shoulders
+          height: analysisData.height,
+          weight: analysisData.weight,
+          gender: analysisData.gender,
+          season: analysisData.season,
+          shoeSize: analysisData.shoeSize
         },
         stylePreferences: ['Кэжуал', 'Классический'], // Можно получать из StylePreferences
         colorPreferences: ['Нейтральные', 'Темные'], // Можно получать из StylePreferences
         occasion: selectedOccasion,
-        season: 'all', // Можно определять по дате
+        season: analysisData.season,
         budget: 'medium'
       };
 
-      // Генерируем 3 образа с новым AI сервисом
+      // Генерируем 1 образ с AI сервисом
       const outfits: GeneratedOutfit[] = [];
-      for (let i = 0; i < 3; i++) {
-        const outfit = await aiService.generateOutfit(request);
-        outfits.push(outfit);
-      }
+      const outfit = await aiService.generateOutfit(request);
+      outfits.push(outfit);
       setGeneratedOutfits(outfits);
       
       toast({
-        title: "Образы сгенерированы",
-        description: `Создано ${outfits.length} персональных луков`,
+        title: "Образ сгенерирован",
+        description: `Создан персональный лук с учетом ваших параметров`,
       });
       
-      onComplete?.();
+      onComplete?.(outfits[0]); // Передаем первый сгенерированный образ
     } catch (error) {
-      toast({
-        title: "Ошибка генерации",
-        description: "Не удалось создать образы. Попробуйте еще раз.",
-        variant: "destructive"
-      });
+      console.error('Failed to generate outfit:', error);
+      
+      // Если Gemini недоступен, показываем информацию и используем симуляцию
+      if (error.message?.includes('Gemini') || error.message?.includes('503')) {
+        toast({
+          title: "Gemini API временно недоступен",
+          description: "Сервер перегружен. Используем демо-режим. Попробуйте позже.",
+          variant: "default"
+        });
+        
+        // Генерируем симуляционный образ
+        const simulatedOutfit = aiService.simulateResponse(request);
+        outfits.push(simulatedOutfit);
+        setGeneratedOutfits(outfits);
+        
+        toast({
+          title: "Демо-образ создан",
+          description: "Показываем пример образа. Для реальных рекомендаций попробуйте позже.",
+        });
+      } else {
+        toast({
+          title: "Ошибка генерации",
+          description: "Не удалось создать образы. Проверьте настройки AI API или попробуйте позже.",
+          variant: "destructive"
+        });
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -92,9 +112,22 @@ export const OutfitGenerator = ({ analysisData, onComplete }: OutfitGeneratorPro
                        currentProvider === 'local' ? 'Локальная модель' : 'Симуляция'}
                 </Badge>
               </div>
-              <div className="flex gap-2">
-                <Badge variant="secondary">Тип фигуры: {analysisData.bodyType}</Badge>
-                <Badge variant="outline">Рост: {analysisData.measurements.height} см</Badge>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <Badge variant="secondary" className="flex items-center gap-1">
+                  <User className="w-3 h-3" />
+                  {analysisData.bodyType}
+                </Badge>
+                <Badge variant="outline" className="flex items-center gap-1">
+                  <Ruler className="w-3 h-3" />
+                  {analysisData.height} см
+                </Badge>
+                <Badge variant="outline" className="flex items-center gap-1">
+                  <Scale className="w-3 h-3" />
+                  {analysisData.weight} кг
+                </Badge>
+                <Badge variant="outline">
+                  {analysisData.gender === 'female' ? 'Женский' : 'Мужской'}
+                </Badge>
               </div>
             </div>
           )}
@@ -218,11 +251,22 @@ export const OutfitGenerator = ({ analysisData, onComplete }: OutfitGeneratorPro
                 ))}
               </div>
 
-              <div className="flex flex-col items-center gap-4">
-                <Button onClick={generateOutfits} className="px-8" variant="outline">
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Сгенерировать новые образы
-                </Button>
+                             <div className="flex flex-col items-center gap-4">
+                 <Button onClick={generateOutfits} className="px-8" variant="outline">
+                   <RefreshCw className="w-4 h-4 mr-2" />
+                   Сгенерировать новые образы
+                 </Button>
+                 
+                 {currentProvider === 'simulation' && (
+                   <div className="text-center p-4 bg-muted/30 rounded-lg">
+                     <p className="text-sm text-muted-foreground mb-2">
+                       💡 Используется демо-режим
+                     </p>
+                     <p className="text-xs text-muted-foreground">
+                       Gemini API временно недоступен. Попробуйте позже.
+                     </p>
+                   </div>
+                 )}
 
                 <Button 
                   onClick={() => {

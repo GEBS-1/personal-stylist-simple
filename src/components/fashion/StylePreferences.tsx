@@ -3,10 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import { Palette, Shirt, DollarSign, ChevronRight } from "lucide-react";
+import { Palette, Shirt, DollarSign, ChevronRight, User, Ruler, Scale } from "lucide-react";
+import { BodyData } from "./ManualBodyInput";
 
 interface StylePreferencesProps {
-  analysisData?: any;
+  analysisData?: BodyData;
   onComplete?: () => void;
 }
 
@@ -72,13 +73,39 @@ export const StylePreferences = ({ analysisData, onComplete }: StylePreferencesP
             </div>
           </div>
 
-          {/* Информация об анализе фигуры */}
+          {/* Информация о введенных данных */}
           {analysisData && (
             <div className="bg-muted/30 rounded-lg p-4">
-              <h4 className="font-medium mb-2">Ваш тип фигуры: {analysisData.bodyType}</h4>
-              <p className="text-sm text-muted-foreground">
-                Рекомендации учитывают особенности вашей фигуры
-              </p>
+              <h4 className="font-medium mb-2 flex items-center gap-2">
+                <User className="w-4 h-4" />
+                Ваши данные
+              </h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Рост:</span>
+                  <div className="font-medium flex items-center gap-1">
+                    <Ruler className="w-3 h-3" />
+                    {analysisData.height} см
+                  </div>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Вес:</span>
+                  <div className="font-medium flex items-center gap-1">
+                    <Scale className="w-3 h-3" />
+                    {analysisData.weight} кг
+                  </div>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Пол:</span>
+                  <div className="font-medium">
+                    {analysisData.gender === 'female' ? 'Женский' : 'Мужской'}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Тип фигуры:</span>
+                  <div className="font-medium">{analysisData.bodyType}</div>
+                </div>
+              </div>
             </div>
           )}
 

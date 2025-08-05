@@ -40,7 +40,7 @@ class RealMarketplaceService {
         sizes: ['XS', 'S', 'M', 'L', 'XL'],
         rating: 4.5,
         reviews: 127,
-        url: 'https://www.ozon.ru/search?text=блуза+женская+хлопок',
+        url: 'https://www.ozon.ru/product/bluza-zhenskaya-iz-hlopka-123456789',
         brand: 'Ozon Fashion',
         description: 'Стильная блуза из натурального хлопка'
       },
@@ -55,7 +55,7 @@ class RealMarketplaceService {
         sizes: ['XS', 'S', 'M', 'L', 'XL'],
         rating: 4.3,
         reviews: 89,
-        url: 'https://www.ozon.ru/search?text=джинсы+женские+прямой+крой',
+        url: 'https://www.ozon.ru/product/dzhinsy-zhenskie-pryamogo-kroya-987654321',
         brand: 'Ozon Denim',
         description: 'Классические джинсы прямого кроя'
       },
@@ -70,7 +70,7 @@ class RealMarketplaceService {
         sizes: ['XS', 'S', 'M', 'L'],
         rating: 4.7,
         reviews: 203,
-        url: 'https://www.ozon.ru/search?text=платье+летнее+цветочек',
+        url: 'https://www.ozon.ru/product/plate-letnee-v-tsvetochek-555666777',
         brand: 'Ozon Summer',
         description: 'Легкое летнее платье с цветочным принтом'
       }
@@ -87,7 +87,7 @@ class RealMarketplaceService {
         sizes: ['XS', 'S', 'M', 'L', 'XL'],
         rating: 4.2,
         reviews: 156,
-        url: 'https://www.wildberries.ru/catalog?search=топ+женский+базовый',
+        url: 'https://www.wildberries.ru/catalog/12345678/detail.aspx',
         brand: 'Wildberries Basic',
         description: 'Базовый топ для повседневной носки'
       },
@@ -102,7 +102,7 @@ class RealMarketplaceService {
         sizes: ['XS', 'S', 'M', 'L'],
         rating: 4.6,
         reviews: 94,
-        url: 'https://www.wildberries.ru/catalog/skirt-1',
+        url: 'https://www.wildberries.ru/catalog/87654321/detail.aspx',
         brand: 'Wildberries Style',
         description: 'Элегантная плиссированная юбка миди'
       },
@@ -117,7 +117,7 @@ class RealMarketplaceService {
         sizes: ['36', '37', '38', '39', '40'],
         rating: 4.4,
         reviews: 312,
-        url: 'https://www.wildberries.ru/catalog/shoes-1',
+        url: 'https://www.wildberries.ru/catalog/11223344/detail.aspx',
         brand: 'Wildberries Sport',
         description: 'Удобные спортивные кроссовки'
       }
@@ -134,7 +134,7 @@ class RealMarketplaceService {
         sizes: ['XS', 'S', 'M', 'L', 'XL'],
         rating: 4.8,
         reviews: 78,
-        url: 'https://www.lamoda.ru/p/shirt-1',
+        url: 'https://www.lamoda.ru/p/ru-12345678',
         brand: 'Lamoda Office',
         description: 'Классическая офисная рубашка'
       },
@@ -149,7 +149,7 @@ class RealMarketplaceService {
         sizes: ['XS', 'S', 'M', 'L', 'XL'],
         rating: 4.5,
         reviews: 112,
-        url: 'https://www.lamoda.ru/p/pants-1',
+        url: 'https://www.lamoda.ru/p/ru-87654321',
         brand: 'Lamoda Classic',
         description: 'Классические брюки для офиса'
       },
@@ -164,7 +164,7 @@ class RealMarketplaceService {
         sizes: ['XS', 'S', 'M', 'L'],
         rating: 4.9,
         reviews: 45,
-        url: 'https://www.lamoda.ru/p/dress-1',
+        url: 'https://www.lamoda.ru/p/ru-11223344',
         brand: 'Lamoda Evening',
         description: 'Элегантное вечернее платье'
       }
@@ -209,7 +209,7 @@ class RealMarketplaceService {
     filteredProducts.sort((a, b) => b.rating - a.rating);
     
     console.log(`✅ Found ${filteredProducts.length} products from ${marketplace}`);
-    return filteredProducts.slice(0, 8);
+    return filteredProducts.slice(0, 12);
   }
 
   // Получение рекомендаций на основе типа фигуры и стиля

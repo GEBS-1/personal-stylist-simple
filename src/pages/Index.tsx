@@ -1,61 +1,68 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-  Camera, 
   User, 
-  Shirt, 
   Sparkles, 
   ChevronRight,
-  Upload,
   Calculator,
   Palette,
   ShoppingBag
 } from "lucide-react";
-import { BodyAnalysis } from "@/components/fashion/BodyAnalysis";
+import { ManualBodyInput, BodyData } from "@/components/fashion/ManualBodyInput";
 import { StylePreferences } from "@/components/fashion/StylePreferences";
 import { OutfitGenerator } from "@/components/fashion/OutfitGenerator";
-import { ProductCatalog } from "@/components/fashion/ProductCatalog";
+import ProductCatalog from "@/components/fashion/ProductCatalog";
+import TestAPI from "@/components/TestAPI";
+import { logConfig } from "@/config/env";
 
-interface AnalysisData {
+interface AnalysisData extends BodyData {
   bodyType: string;
-  measurements: any;
+  measurements?: any;
 }
 
 const Index = () => {
-  const [activeStep, setActiveStep] = useState<'analysis' | 'preferences' | 'outfits' | 'catalog'>('analysis');
+  console.log('🎯 Index component is rendering...');
+  
+  const [activeStep, setActiveStep] = useState<'analysis' | 'preferences' | 'outfits' | 'catalog' | 'test'>('analysis');
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
+  const [generatedOutfit, setGeneratedOutfit] = useState<any>(null);
+
+  useEffect(() => {
+    // Логируем конфигурацию при загрузке
+    logConfig();
+  }, []);
 
   const handleStepComplete = (stepId: string, data?: any) => {
     setCompletedSteps(prev => new Set([...prev, stepId]));
     
     if (stepId === 'analysis' && data) {
       setAnalysisData(data);
-      // НЕ переходим автоматически к следующему шагу
-      // Пользователь сам решит, когда готов
     } else if (stepId === 'preferences') {
       setActiveStep('outfits');
     } else if (stepId === 'outfits') {
       setActiveStep('catalog');
     }
+    
+    // Сохраняем сгенерированный образ
+    if (stepId === 'outfits' && data) {
+      setGeneratedOutfit(data);
+    }
   };
 
-  // Функция для перехода к следующему шагу после анализа
   const handleContinueFromAnalysis = () => {
     setActiveStep('preferences');
   };
 
-  // Сохраняем данные при переходе между шагами
-  const handleStepChange = (step: 'analysis' | 'preferences' | 'outfits' | 'catalog') => {
+  const handleStepChange = (step: 'analysis' | 'preferences' | 'outfits' | 'catalog' | 'test') => {
     setActiveStep(step);
   };
 
   const handleStartAnalysis = () => {
     setActiveStep('analysis');
-    // Прокрутить к разделу анализа фото
     setTimeout(() => {
       const analysisSection = document.querySelector('[data-step="analysis"]');
       if (analysisSection) {
@@ -67,9 +74,9 @@ const Index = () => {
   const steps = [
     {
       id: 'analysis',
-      title: 'Анализ фигуры',
-      description: 'Определение типа фигуры и параметров',
-      icon: Camera,
+      title: 'Ввод данных',
+      description: 'Ручной ввод параметров фигуры',
+      icon: User,
       completed: completedSteps.has('analysis')
     },
     {
@@ -92,6 +99,13 @@ const Index = () => {
       description: 'Рекомендуемые товары из маркетплейсов',
       icon: ShoppingBag,
       completed: completedSteps.has('catalog')
+    },
+    {
+      id: 'test',
+      title: 'Тест API',
+      description: 'Проверка подключения сервисов',
+      icon: Calculator,
+      completed: false
     }
   ];
 
@@ -104,12 +118,12 @@ const Index = () => {
             Ваш <span className="text-primary">ИИ-стилист</span>
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
-            Персональный подбор одежды на основе анализа вашей фигуры, стиля и предпочтений
+            Персональный подбор одежды на основе ручного ввода данных о фигуре
           </p>
           <div className="flex flex-wrap gap-3 justify-center mb-8">
             <Badge variant="secondary" className="px-4 py-2 text-sm">
-              <Camera className="w-4 h-4 mr-2" />
-              Анализ фото
+              <User className="w-4 h-4 mr-2" />
+              Ручной ввод данных
             </Badge>
             <Badge variant="secondary" className="px-4 py-2 text-sm">
               <Sparkles className="w-4 h-4 mr-2" />
@@ -122,12 +136,19 @@ const Index = () => {
           </div>
           <Button 
             size="lg" 
-            className="elegant-shadow"
             onClick={handleStartAnalysis}
+            className="elegant-shadow smooth-transition"
           >
-            Начать стилизацию
+            Начать подбор
             <ChevronRight className="w-5 h-5 ml-2" />
           </Button>
+          
+          <div className="mt-6 p-4 bg-muted/30 rounded-lg max-w-2xl mx-auto">
+            <p className="text-sm text-muted-foreground">
+              💡 <strong>Демо-режим:</strong> Приложение работает с тестовыми данными. 
+              Для реальных рекомендаций настройте API ключи в файле .env
+            </p>
+          </div>
         </div>
       </section>
 
@@ -142,13 +163,13 @@ const Index = () => {
                 const isCompleted = step.completed;
                 
                 return (
-                                     <button
-                     key={step.id}
-                     onClick={() => handleStepChange(step.id as any)}
-                     className={`flex flex-col items-center space-y-2 min-w-0 smooth-transition ${
-                       isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-                     }`}
-                   >
+                  <button
+                    key={step.id}
+                    onClick={() => handleStepChange(step.id as any)}
+                    className={`flex flex-col items-center space-y-2 min-w-0 smooth-transition ${
+                      isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
                     <div className={`w-16 h-16 rounded-full border-2 flex items-center justify-center smooth-transition ${
                       isActive 
                         ? 'border-primary bg-primary text-primary-foreground' 
@@ -170,20 +191,18 @@ const Index = () => {
         </div>
       </section>
 
-      
-
       {/* Main Content */}
       <section className="py-12 px-6">
         <div className="max-w-7xl mx-auto">
           <Tabs value={activeStep} className="space-y-8">
             <TabsContent value="analysis" className="space-y-8" data-step="analysis">
               <div className="text-center mb-8">
-                <h2 className="font-display text-3xl font-bold mb-4">Анализ фигуры</h2>
+                <h2 className="font-display text-3xl font-bold mb-4">Ввод данных о фигуре</h2>
                 <p className="text-muted-foreground max-w-2xl mx-auto">
-                  Загрузите фото или введите параметры вручную для определения типа фигуры
+                  Введите ваши параметры для точного подбора одежды
                 </p>
               </div>
-                                           <BodyAnalysis 
+              <ManualBodyInput 
                 onComplete={(data) => handleStepComplete('analysis', data)}
                 onContinue={handleContinueFromAnalysis}
                 analysisData={analysisData}
@@ -212,7 +231,7 @@ const Index = () => {
               </div>
               <OutfitGenerator 
                 analysisData={analysisData}
-                onComplete={() => handleStepComplete('outfits')} 
+                onComplete={(outfit) => handleStepComplete('outfits', outfit)} 
               />
             </TabsContent>
 
@@ -223,83 +242,19 @@ const Index = () => {
                   Рекомендуемые товары из Ozon, Wildberries и Lamoda
                 </p>
               </div>
-              <ProductCatalog analysisData={analysisData} />
+              <ProductCatalog analysisData={analysisData} generatedOutfit={generatedOutfit} />
+            </TabsContent>
+
+            <TabsContent value="test" className="space-y-8">
+              <div className="text-center mb-8">
+                <h2 className="font-display text-3xl font-bold mb-4">Тестирование API</h2>
+                <p className="text-muted-foreground max-w-2xl mx-auto">
+                  Проверка подключения к AI сервисам и маркетплейсам
+                </p>
+              </div>
+              <TestAPI />
             </TabsContent>
           </Tabs>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="py-20 px-6 bg-muted/30">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="font-display text-4xl font-bold mb-4">Возможности платформы</h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Полный цикл персонального стайлинга с использованием ИИ-технологий
-            </p>
-          </div>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <Card className="glass-card smooth-transition hover:elegant-shadow">
-              <CardHeader>
-                <Upload className="w-12 h-12 text-primary mb-4" />
-                <CardTitle>Анализ фото</CardTitle>
-                <CardDescription>
-                  Автоматический анализ фигуры через MediaPipe с определением ключевых точек тела
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="glass-card smooth-transition hover:elegant-shadow">
-              <CardHeader>
-                <Calculator className="w-12 h-12 text-primary mb-4" />
-                <CardTitle>Ручной ввод</CardTitle>
-                <CardDescription>
-                  Возможность ввода параметров вручную с интеллектуальным размерным калькулятором
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="glass-card smooth-transition hover:elegant-shadow">
-              <CardHeader>
-                <User className="w-12 h-12 text-primary mb-4" />
-                <CardTitle>Типирование фигуры</CardTitle>
-                <CardDescription>
-                  Определение типа фигуры по стандартной классификации (яблоко, груша и др.)
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="glass-card smooth-transition hover:elegant-shadow">
-              <CardHeader>
-                <Palette className="w-12 h-12 text-primary mb-4" />
-                <CardTitle>Цветотип</CardTitle>
-                <CardDescription>
-                  Анализ цветотипа по сезону и подбор подходящей цветовой палитры
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="glass-card smooth-transition hover:elegant-shadow">
-              <CardHeader>
-                <Sparkles className="w-12 h-12 text-primary mb-4" />
-                <CardTitle>ИИ-генерация</CardTitle>
-                <CardDescription>
-                  Создание образов с помощью GPT-4 с учетом всех персональных параметров
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="glass-card smooth-transition hover:elegant-shadow">
-              <CardHeader>
-                <ShoppingBag className="w-12 h-12 text-primary mb-4" />
-                <CardTitle>Интеграция</CardTitle>
-                <CardDescription>
-                  Подбор товаров из популярных маркетплейсов с учетом размерных сеток
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          </div>
         </div>
       </section>
     </div>

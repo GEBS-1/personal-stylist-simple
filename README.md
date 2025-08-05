@@ -1,73 +1,103 @@
-# Welcome to your Lovable project
+# Personal Stylist - Упрощенная версия
 
-## Project info
+Персональный ИИ-стилист для подбора одежды на основе ручного ввода данных о фигуре.
 
-**URL**: https://lovable.dev/projects/598aa315-7980-4beb-9984-b3e3c0c6353c
+## ✨ Особенности
 
-## How can I edit this code?
+- **Ручной ввод данных** - введите параметры фигуры вручную
+- **6 типов фигур** - точное определение типа фигуры с рекомендациями
+- **ИИ-рекомендации** - генерация персональных образов с помощью AI
+- **Интеграция с маркетплейсами** - поиск товаров на Ozon, Wildberries, Lamoda
+- **Современный UI** - красивый и удобный интерфейс
 
-There are several ways of editing your application.
+## 🚀 Быстрый старт
 
-**Use Lovable**
+### Установка зависимостей
+```bash
+npm install
+```
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/598aa315-7980-4beb-9984-b3e3c0c6353c) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+### Запуск в режиме разработки
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Приложение будет доступно на http://localhost:8081
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## 📋 Типы фигур
 
-**Use GitHub Codespaces**
+1. **⏳ Песочные часы** - определенная талия, грудь ≈ бедра
+2. **🔻 Перевернутый треугольник** - широкие плечи, узкие бедра  
+3. **🔺 Треугольник** - узкие плечи, широкие бедра
+4. **⬜ Прямоугольник** - прямая фигура, плечи ≈ талия ≈ бедра
+5. **⭕ Круг** - полнота в средней части
+6. **💎 Ромб** - широкая средняя часть, узкие плечи и бедра
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## 🔧 Настройка
 
-## What technologies are used for this project?
+### 1. AI API (опционально)
+Для работы с реальным AI вместо симуляции:
 
-This project is built with:
+**Google Gemini (рекомендуется):**
+1. Получите API ключ на [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Создайте файл `.env` в корне проекта
+3. Добавьте: `VITE_GEMINI_API_KEY=ваш_ключ`
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+**Другие AI провайдеры:**
+- OpenAI GPT-4: `VITE_OPENAI_API_KEY`
+- Anthropic Claude: `VITE_CLAUDE_API_KEY`
+- Cohere: `VITE_COHERE_API_KEY`
 
-## How can I deploy this project?
+### 2. Wildberries API (опционально)
+Для улучшенного поиска товаров:
+1. Получите API ключ Wildberries (если доступен)
+2. Добавьте в `.env`: `VITE_WILDBERRIES_API_KEY=ваш_ключ`
 
-Simply open [Lovable](https://lovable.dev/projects/598aa315-7980-4beb-9984-b3e3c0c6353c) and click on Share -> Publish.
+**Примечание:** Приложение работает и без API ключей, используя симуляцию и fallback данные.
 
-## Can I connect a custom domain to my Lovable project?
+## 📁 Структура проекта
 
-Yes, you can!
+```
+src/
+├── components/
+│   ├── fashion/
+│   │   ├── ManualBodyInput.tsx    # Ручной ввод данных
+│   │   ├── StylePreferences.tsx   # Стилевые предпочтения
+│   │   ├── OutfitGenerator.tsx    # Генерация образов
+│   │   └── ProductCatalog.tsx     # Каталог товаров
+│   └── ui/                        # UI компоненты
+├── services/
+│   ├── aiService.ts               # AI сервис
+│   └── marketplaceService.ts      # Маркетплейсы
+└── pages/
+    └── Index.tsx                  # Главная страница
+```
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## 🎯 Как использовать
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+1. **Ввод данных** - укажите рост, вес, пол, размер обуви и выберите тип фигуры
+2. **Стилевые предпочтения** - выберите любимые стили и цвета
+3. **Генерация образов** - ИИ создаст персональные луки
+4. **Каталог товаров** - найдите похожие товары на маркетплейсах
+
+## 🛠 Технологии
+
+- **Frontend**: React 18 + TypeScript + Vite
+- **UI**: Tailwind CSS + shadcn/ui
+- **AI**: Google Gemini API (основной), OpenAI, Claude
+- **Маркетплейсы**: Wildberries (с fallback данными)
+
+## 📝 Лицензия
+
+MIT License
+
+## 🤝 Вклад в проект
+
+1. Форкните репозиторий
+2. Создайте ветку для новой функции
+3. Внесите изменения
+4. Создайте Pull Request
+
+---
+
+**Упрощенная версия без анализа фото** - идеально для быстрого старта и тестирования!

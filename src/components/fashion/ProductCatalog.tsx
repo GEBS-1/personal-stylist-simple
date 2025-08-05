@@ -1,26 +1,26 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingBag, Loader2, ExternalLink, Star } from "lucide-react";
-import { realMarketplaceService, RealProduct } from "@/services/realMarketplaceService";
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/components/ui/use-toast";
+import { ShoppingBag, Star, Heart, ExternalLink, TestTube, Loader2 } from "lucide-react";
+import { wildberriesService, Product, SearchParams } from "@/services/wildberriesService";
+import { BodyData } from "./ManualBodyInput";
 
 interface ProductCatalogProps {
-  analysisData?: {
-    bodyType: string;
-    stylePreferences?: string[];
-    budget?: string;
-  };
+  analysisData: BodyData;
+  generatedOutfit: any;
 }
 
-export const ProductCatalog = ({ analysisData }: ProductCatalogProps) => {
-  const [products, setProducts] = useState<RealProduct[]>([]);
+export default function ProductCatalog({ analysisData, generatedOutfit }: ProductCatalogProps) {
+  const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedMarketplace, setSelectedMarketplace] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const { toast } = useToast();
 
-  // Загрузка рекомендаций при изменении данных анализа
   useEffect(() => {
-    if (analysisData?.bodyType) {
+    if (analysisData && !isLoading) {
       loadRecommendations();
     }
   }, [analysisData]);
@@ -29,180 +29,310 @@ export const ProductCatalog = ({ analysisData }: ProductCatalogProps) => {
     if (!analysisData) return;
     
     setIsLoading(true);
-    try {
-      const style = analysisData.stylePreferences?.[0] || 'casual';
-      const budget = analysisData.budget || 'medium';
-      
-      const recommendations = await realMarketplaceService.getRecommendations(
-        analysisData.bodyType,
-        style,
-        budget
-      );
-      
-      setProducts(recommendations);
-    } catch (error) {
-      console.error('Failed to load recommendations:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleMarketplaceClick = async (marketplace: string) => {
-    setSelectedMarketplace(marketplace);
-    setIsLoading(true);
     
     try {
-      const filters = {
-        category: 'blouse',
-        colors: ['black', 'white'],
-        priceRange: { min: 1000, max: 10000 }
+      const params: SearchParams = {
+        query: 'одежда',
+        bodyType: analysisData.bodyType,
+        occasion: 'casual',
+        budget: 'medium',
+        gender: analysisData.gender
       };
+
+      const recommendations = await wildberriesService.getRecommendations(params);
+      setProducts(recommendations);
       
-      const marketplaceProducts = await realMarketplaceService.searchProducts(filters, marketplace);
-      setProducts(marketplaceProducts);
+      toast({
+        title: "Рекомендации загружены",
+        description: `Найдено ${recommendations.length} товаров на Wildberries`,
+      });
+      
+      // Показываем информацию о режиме работы
+      if (recommendations.some(p => p.id.includes('fallback'))) {
+        toast({
+          title: "Режим демонстрации",
+          description: "Показываем тестовые данные. Для реальных товаров настройте API ключи.",
+          variant: "default"
+        });
+      }
+      
     } catch (error) {
-      console.error(`Failed to load ${marketplace} products:`, error);
+      console.error('Failed to load recommendations:', error);
+      toast({
+        title: "Ошибка загрузки",
+        description: "Не удалось загрузить рекомендации. Попробуйте еще раз.",
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleProductClick = (product: RealProduct) => {
-    console.log('🛒 Opening product link:', product.url);
+  const handleCategoryClick = async (category: string) => {
+    if (!analysisData || isLoading || selectedCategory === category) return;
+    
+    setIsLoading(true);
+    setSelectedCategory(category);
+    
     try {
-      window.open(product.url, '_blank', 'noopener,noreferrer');
+      const params: SearchParams = {
+        query: category,
+        bodyType: analysisData.bodyType,
+        occasion: 'casual',
+        budget: 'medium',
+        gender: analysisData.gender
+      };
+
+      const categoryProducts = await wildberriesService.searchProducts(params);
+      setProducts(categoryProducts);
+      
     } catch (error) {
-      console.error('Failed to open product link:', error);
-      // Fallback: показываем информацию о товаре
-      alert(`Товар: ${product.name}\nЦена: ${product.price} ₽\nМаркетплейс: ${product.marketplace}`);
+      console.error('Failed to load category products:', error);
+      toast({
+        title: "Ошибка загрузки",
+        description: "Не удалось загрузить товары категории.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleProductClick = (product: Product) => {
+    window.open(product.url, '_blank');
+  };
+
+  const categories = [
+    { id: 'all', name: 'Все товары', icon: '🛍️' },
+    { id: 'юбка', name: 'Юбки', icon: '👗' },
+    { id: 'брюки', name: 'Брюки', icon: '👖' },
+    { id: 'блуза', name: 'Блузы', icon: '👚' },
+    { id: 'платье', name: 'Платья', icon: '👗' },
+    { id: 'костюм', name: 'Костюмы', icon: '👔' }
+  ];
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('ru-RU').format(price) + ' ₽';
+  };
+
+  // Добавляем функцию тестирования API
+  const testWildberriesAPI = async () => {
+    setIsLoading(true);
+    try {
+      const result = await wildberriesService.testAPI();
+      
+      if (result.success) {
+        toast({
+          title: "✅ API Test Successful",
+          description: result.message,
+        });
+        console.log('🧪 API Test Result:', result.data);
+      } else {
+        toast({
+          title: "❌ API Test Failed",
+          description: result.message,
+          variant: "destructive",
+        });
+        console.error('🧪 API Test Error:', result.data);
+      }
+    } catch (error) {
+      toast({
+        title: "❌ Test Error",
+        description: `Failed to test API: ${error}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="max-w-6xl mx-auto">
-      <Card className="glass-card">
+    <div className="max-w-7xl mx-auto space-y-8">
+      {/* Заголовок и информация */}
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ShoppingBag className="w-5 h-5" />
-            Каталог товаров
+            Рекомендации Wildberries
+            {products.some(p => p.id.includes('fallback')) && (
+              <Badge variant="outline" className="text-xs">
+                Демо режим
+              </Badge>
+            )}
           </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {analysisData && (
-            <div className="bg-muted/30 rounded-lg p-4">
-              <h4 className="font-medium mb-2">Рекомендации для вашего типа фигуры:</h4>
-              <div className="flex gap-2 flex-wrap">
-                <Badge variant="secondary">Тип фигуры: {analysisData.bodyType}</Badge>
-                <Badge variant="outline">Персональные рекомендации</Badge>
-                {analysisData.stylePreferences && (
-                  <Badge variant="outline">Стиль: {analysisData.stylePreferences[0]}</Badge>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Маркетплейсы */}
-          <div className="grid md:grid-cols-3 gap-4">
-            <Button 
-              variant={selectedMarketplace === 'ozon' ? 'default' : 'outline'}
-              onClick={() => handleMarketplaceClick('ozon')}
-              disabled={isLoading}
-              className="h-16"
-            >
-              {isLoading && selectedMarketplace === 'ozon' ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <ShoppingBag className="w-4 h-4 mr-2" />
-              )}
-              Ozon
-            </Button>
-            <Button 
-              variant={selectedMarketplace === 'wildberries' ? 'default' : 'outline'}
-              onClick={() => handleMarketplaceClick('wildberries')}
-              disabled={isLoading}
-              className="h-16"
-            >
-              {isLoading && selectedMarketplace === 'wildberries' ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <ShoppingBag className="w-4 h-4 mr-2" />
-              )}
-              Wildberries
-            </Button>
-            <Button 
-              variant={selectedMarketplace === 'lamoda' ? 'default' : 'outline'}
-              onClick={() => handleMarketplaceClick('lamoda')}
-              disabled={isLoading}
-              className="h-16"
-            >
-              {isLoading && selectedMarketplace === 'lamoda' ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <ShoppingBag className="w-4 h-4 mr-2" />
-              )}
-              Lamoda
-            </Button>
+          <div className="text-sm text-muted-foreground">
+            Персональные рекомендации на основе ваших данных
           </div>
-
-          {/* Продукты */}
-          {isLoading ? (
-            <div className="text-center py-12">
-              <Loader2 className="w-8 h-8 mx-auto mb-4 animate-spin" />
-              <p>Загружаем товары...</p>
-            </div>
-          ) : products.length > 0 ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {products.map((product) => (
-                <Card key={product.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                  <div className="aspect-[3/4] bg-muted relative">
-                    <img 
-                      src={product.imageUrl} 
-                      alt={product.name}
-                      className="w-full h-full object-cover"
-                    />
-                    <Badge className="absolute top-2 left-2">
-                      {product.marketplace}
-                    </Badge>
-                  </div>
-                  <CardContent className="p-4">
-                    <h3 className="font-medium text-sm mb-2 line-clamp-2">{product.name}</h3>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-bold text-lg">{product.price} ₽</span>
-                      <div className="flex items-center gap-1">
-                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                        <span className="text-sm">{product.rating.toFixed(1)}</span>
-                      </div>
-                    </div>
-                    <div className="flex gap-1 mb-3">
-                      {product.colors.slice(0, 3).map((color) => (
-                        <Badge key={color} variant="outline" className="text-xs">
-                          {color}
-                        </Badge>
-                      ))}
-                    </div>
-                    <Button 
-                      size="sm" 
-                      className="w-full"
-                      onClick={() => handleProductClick(product)}
-                    >
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Перейти к товару
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <ShoppingBag className="w-16 h-16 mx-auto mb-4 text-primary" />
-              <h3 className="text-xl font-medium mb-2">Выберите маркетплейс</h3>
-              <p className="text-muted-foreground">
-                Нажмите на кнопку маркетплейса выше, чтобы увидеть товары
-              </p>
+        </CardHeader>
+        <CardContent>
+          {analysisData && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div>
+                <span className="text-muted-foreground">Тип фигуры:</span>
+                <div className="font-medium">{analysisData.bodyType}</div>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Пол:</span>
+                <div className="font-medium">
+                  {analysisData.gender === 'female' ? 'Женский' : 'Мужской'}
+                </div>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Рост:</span>
+                <div className="font-medium">{analysisData.height} см</div>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Размер обуви:</span>
+                <div className="font-medium">{analysisData.shoeSize}</div>
+              </div>
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Категории */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Категории товаров</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            {categories.map((category) => (
+              <Button
+                key={category.id}
+                variant={selectedCategory === category.id ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleCategoryClick(category.id)}
+                disabled={isLoading}
+                className="flex items-center gap-2"
+              >
+                <span>{category.icon}</span>
+                {category.name}
+              </Button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Товары */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Товары</CardTitle>
+            <Badge variant="secondary">
+              {products.length} товаров
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin mr-2" />
+              <span>Загружаем товары...</span>
+            </div>
+          ) : products.length === 0 ? (
+            <div className="text-center py-12">
+              <ShoppingBag className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+              <h3 className="text-lg font-medium mb-2">Товары не найдены</h3>
+              <p className="text-muted-foreground">
+                Попробуйте изменить параметры поиска
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {products.map((product) => (
+                <Card key={product.id} className="hover:shadow-lg transition-shadow cursor-pointer">
+                  <CardContent className="p-4">
+                    {/* Изображение */}
+                    <div className="aspect-square bg-muted rounded-lg mb-4 flex items-center justify-center">
+                      <img
+                        src={product.image}
+                        alt={product.name}
+                        className="w-full h-full object-cover rounded-lg"
+                        onError={(e) => {
+                          e.currentTarget.src = '/placeholder.svg';
+                        }}
+                      />
+                    </div>
+
+                    {/* Информация о товаре */}
+                    <div className="space-y-2">
+                      <h3 className="font-medium text-sm line-clamp-2">{product.name}</h3>
+                      
+                      {/* Цена */}
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-lg">
+                          {formatPrice(product.price)}
+                        </span>
+                        {product.originalPrice && product.originalPrice > product.price && (
+                          <span className="text-sm text-muted-foreground line-through">
+                            {formatPrice(product.originalPrice)}
+                          </span>
+                        )}
+                        {product.discount && (
+                          <Badge variant="destructive" className="text-xs">
+                            -{product.discount}%
+                          </Badge>
+                        )}
+                      </div>
+
+                      {/* Рейтинг */}
+                      {product.rating && (
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                          <span>{product.rating}</span>
+                          {product.reviews && (
+                            <span>({product.reviews})</span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Цвета */}
+                      {product.colors && product.colors.length > 0 && (
+                        <div className="flex gap-1">
+                          {product.colors.slice(0, 3).map((color, index) => (
+                            <Badge key={index} variant="outline" className="text-xs">
+                              {color}
+                            </Badge>
+                          ))}
+                          {product.colors.length > 3 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{product.colors.length - 3}
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Кнопка перехода */}
+                      <Button
+                        onClick={() => handleProductClick(product)}
+                        className="w-full mt-3"
+                        size="sm"
+                      >
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        Перейти к товару
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Добавляем кнопку тестирования */}
+      <div className="flex items-center justify-center mt-6">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={testWildberriesAPI}
+          disabled={isLoading}
+        >
+          <TestTube className="w-4 h-4 mr-2" />
+          Test API
+        </Button>
+      </div>
     </div>
   );
 };
