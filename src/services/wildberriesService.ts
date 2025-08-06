@@ -799,17 +799,9 @@ class WildberriesService {
   private getProductImage(productId: number, colorId?: number): string {
     if (!productId) return '/placeholder.svg';
     
-    try {
-      // Формируем URL изображения Wildberries
-      const imageId = Math.floor(productId / 1000);
-      const partId = Math.floor(productId / 10000);
-      const colorSuffix = colorId ? `-${colorId}` : '';
-      
-      return `https://basket-${imageId}.wbbasket.ru/vol${imageId}/part${partId}/${productId}/images/c246x328/1.jpg`;
-    } catch (error) {
-      console.warn('⚠️ Error generating image URL:', error);
-      return '/placeholder.svg';
-    }
+    // Пока используем placeholder, пока не найдем правильный формат URL изображений
+    console.log(`🖼️ Generated image URL for product ${productId}: /placeholder.svg`);
+    return '/placeholder.svg';
   }
 
   private getFallbackProducts(params: SearchParams): Product[] {

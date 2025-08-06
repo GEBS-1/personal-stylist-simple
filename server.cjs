@@ -9,6 +9,15 @@ const PORT = 3001;
 app.use(cors());
 app.use(express.json());
 
+// Функция для генерации URL изображений Wildberries
+function getProductImageUrl(productId) {
+  if (!productId) return '/placeholder.svg';
+  
+  // Пока используем placeholder, пока не найдем правильный формат
+  console.log(`🖼️ Generated image URL for product ${productId}: /placeholder.svg`);
+  return '/placeholder.svg';
+}
+
 // Продвинутый прокси для Wildberries API с множественными методами
 app.get('/api/wildberries/search', async (req, res) => {
   try {
@@ -158,7 +167,7 @@ app.get('/api/wildberries/search', async (req, res) => {
       discount: product.sale ? Math.round(product.sale) : undefined,
       rating: product.rating || 4.0 + Math.random() * 0.5,
       reviews: product.feedbacks || Math.floor(Math.random() * 100) + 10,
-      image: `https://images.wbstatic.net/c246x328/new/${Math.floor(product.id / 1000)}/${product.id}.jpg`,
+      image: getProductImageUrl(product.id),
       url: `https://www.wildberries.ru/catalog/${product.id}/detail.aspx`,
       marketplace: 'wildberries',
       category: query,
@@ -214,7 +223,7 @@ app.get('/api/wildberries/catalog', async (req, res) => {
       discount: product.sale ? Math.round(product.sale) : undefined,
       rating: product.rating || 4.0,
       reviews: product.feedbacks || 0,
-      image: `https://images.wbstatic.net/c246x328/new/${Math.floor(product.id / 1000)}/${product.id}.jpg`,
+      image: getProductImageUrl(product.id),
       url: `https://www.wildberries.ru/catalog/${product.id}/detail.aspx`,
       marketplace: 'wildberries',
       category: category,
@@ -241,6 +250,43 @@ app.get('/api/wildberries/catalog', async (req, res) => {
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// Прокси для изображений Wildberries
+app.get('/api/wildberries/image/:productId', async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const vol = Math.floor(productId / 100000);
+    const part = Math.floor(productId / 10000);
+    
+    const imageUrl = `https://basket-${vol}.wbbasket.ru/vol${vol}/part${part}/${productId}/images/c246x328/1.jpg`;
+    
+    console.log(`🖼️ Proxying image: ${imageUrl}`);
+    
+    const response = await fetch(imageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+        'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.8',
+        'Referer': 'https://www.wildberries.ru/',
+        'Origin': 'https://www.wildberries.ru'
+      }
+    });
+    
+    if (response.ok) {
+      const buffer = await response.arrayBuffer();
+      res.set('Content-Type', 'image/jpeg');
+      res.set('Cache-Control', 'public, max-age=3600');
+      res.send(Buffer.from(buffer));
+    } else {
+      console.warn(`⚠️ Image not found: ${imageUrl}`);
+      res.status(404).json({ error: 'Image not found' });
+    }
+    
+  } catch (error) {
+    console.error('❌ Image proxy error:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 app.listen(PORT, () => {

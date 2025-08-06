@@ -244,14 +244,20 @@ export default function ProductCatalog({ analysisData, generatedOutfit }: Produc
                 <Card key={product.id} className="hover:shadow-lg transition-shadow cursor-pointer">
                   <CardContent className="p-4">
                     {/* Изображение */}
-                    <div className="aspect-square bg-muted rounded-lg mb-4 flex items-center justify-center">
+                    <div className="aspect-square bg-muted rounded-lg mb-4 flex items-center justify-center overflow-hidden">
                       <img
                         src={product.image}
                         alt={product.name}
-                        className="w-full h-full object-cover rounded-lg"
+                        className="w-full h-full object-cover rounded-lg transition-opacity duration-200"
                         onError={(e) => {
+                          console.warn(`⚠️ Failed to load image for product ${product.id}:`, product.image);
                           e.currentTarget.src = '/placeholder.svg';
+                          e.currentTarget.classList.add('opacity-50');
                         }}
+                        onLoad={(e) => {
+                          e.currentTarget.classList.remove('opacity-50');
+                        }}
+                        loading="lazy"
                       />
                     </div>
 
