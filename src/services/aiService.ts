@@ -92,8 +92,8 @@ export class AIService {
             return false;
           }
           
-          // Тестируем разные модели Gemini (обновленный список)
-          const testModels = ['gemini-1.5-flash', 'gemini-1.5-pro-latest', 'gemini-1.0-pro'];
+          // Тестируем разные модели Gemini (актуальный список)
+          const testModels = ['gemini-1.5-flash', 'gemini-1.5-pro'];
           
           for (const model of testModels) {
             try {
@@ -262,11 +262,10 @@ export class AIService {
   }
 
   private async generateWithGemini(request: OutfitRequest): Promise<GeneratedOutfit> {
-    // Пробуем разные модели Gemini (обновленный список)
+    // Пробуем разные модели Gemini (актуальный список)
     const models = [
       'gemini-1.5-flash',
-      'gemini-1.5-pro-latest',
-      'gemini-1.0-pro'
+      'gemini-1.5-pro'
     ];
     
     let lastError: Error | null = null;
