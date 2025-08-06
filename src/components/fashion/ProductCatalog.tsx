@@ -39,7 +39,7 @@ export default function ProductCatalog({ analysisData, generatedOutfit }: Produc
         gender: analysisData.gender
       };
 
-      const recommendations = await wildberriesService.getRecommendations(params);
+      const recommendations = await wildberriesService.getRecommendations(params, generatedOutfit);
       setProducts(recommendations);
       
       toast({

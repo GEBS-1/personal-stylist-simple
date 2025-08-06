@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8081,
-    strictPort: true, // Принудительно использовать порт 8081
+    strictPort: false, // Разрешить использовать другой порт если 8081 занят
     proxy: {
       '/api/openai': {
         target: 'https://api.openai.com',

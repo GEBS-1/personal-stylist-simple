@@ -319,7 +319,20 @@ export class AIService {
 
           const data = await response.json();
           console.log(`✅ Gemini API Success (${model}):`, data);
-          return this.parseResponse(data.candidates[0]?.content?.parts[0]?.text, request);
+          
+          const responseText = data.candidates[0]?.content?.parts[0]?.text;
+          if (!responseText) {
+            console.error(`❌ Empty response from Gemini (${model})`);
+            continue;
+          }
+          
+          try {
+            return this.parseResponse(responseText, request);
+          } catch (parseError) {
+            console.error(`❌ Failed to parse Gemini response (${model}):`, parseError);
+            // Пробуем следующую модель
+            continue;
+          }
           
         } catch (error) {
           console.error(`❌ Gemini API Error (${model}):`, error);
@@ -466,8 +479,10 @@ ${isMale ? `
 - Все предметы должны сочетаться между собой
 - Учитывай сезон и повод
 - Ответь ТОЛЬКО в формате JSON без дополнительного текста
+- ВСЕ строки в JSON должны быть в двойных кавычках
+- В массивах colors и colorPalette используй ТОЛЬКО двойные кавычки
 
-Создай образ в формате JSON:
+Создай образ в формате JSON (обязательно используй двойные кавычки для всех строк):
 {
   "name": "Название образа",
   "description": "Описание образа",
@@ -528,12 +543,24 @@ ${isMale ? `
     // Извлекаем JSON из markdown блока
     const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/);
     if (!jsonMatch) {
-      console.log('⚠️ No JSON block found, using simulation');
+      console.log('⚠️ No JSON block found, trying to find JSON without markdown...');
+      // Попробуем найти JSON без markdown блоков
+      const jsonStart = response.indexOf('{');
+      const jsonEnd = response.lastIndexOf('}');
+      if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+        const jsonString = response.substring(jsonStart, jsonEnd + 1);
+        console.log('🔍 Found JSON without markdown:', jsonString.substring(0, 200) + '...');
+        return this.parseJsonString(jsonString, request);
+      }
+      console.log('⚠️ No JSON found, using simulation');
       return this.simulateResponse(request);
     }
     
     let jsonString = jsonMatch[1]; // Берем содержимое JSON блока
-    
+    return this.parseJsonString(jsonString, request);
+  }
+
+  private parseJsonString(jsonString: string, request: OutfitRequest): GeneratedOutfit {
     // Создаем более надежный парсер
     try {
       // Сначала пробуем парсить как есть
@@ -543,7 +570,7 @@ ${isMale ? `
         return this.transformToGeneratedOutfit(parsed, request);
       }
     } catch (error) {
-      console.log('⚠️ Direct parsing failed, trying manual fix...');
+      console.log('⚠️ Direct parsing failed, trying manual fix...', error);
     }
     
     // Ручная очистка JSON
@@ -556,7 +583,18 @@ ${isMale ? `
         return this.transformToGeneratedOutfit(parsed, request);
       }
     } catch (error) {
-      console.log('⚠️ Manual parsing failed, using simulation');
+      console.log('⚠️ Manual parsing failed, trying advanced parsing...', error);
+    }
+    
+    // Попробуем продвинутый парсинг
+    try {
+      const parsed = this.advancedJsonParsing(jsonString);
+      if (parsed && parsed.items && Array.isArray(parsed.items)) {
+        console.log('✅ Advanced JSON parsing successful');
+        return this.transformToGeneratedOutfit(parsed, request);
+      }
+    } catch (error) {
+      console.log('⚠️ Advanced parsing failed:', error);
     }
     
     // Если все не удалось, используем симуляцию
@@ -564,40 +602,117 @@ ${isMale ? `
     return this.simulateResponse(request);
   }
 
+  private advancedJsonParsing(jsonString: string): any {
+    console.log('🔧 Advanced JSON parsing...');
+    
+    // Извлекаем основные поля с помощью regex
+    const nameMatch = jsonString.match(/"name"\s*:\s*"([^"]+)"/);
+    const descriptionMatch = jsonString.match(/"description"\s*:\s*"([^"]+)"/);
+    const totalPriceMatch = jsonString.match(/"totalPrice"\s*:\s*"([^"]+)"/);
+    const styleNotesMatch = jsonString.match(/"styleNotes"\s*:\s*"([^"]+)"/);
+    const whyItWorksMatch = jsonString.match(/"whyItWorks"\s*:\s*"([^"]+)"/);
+    
+    // Извлекаем colorPalette
+    const colorPaletteMatch = jsonString.match(/"colorPalette"\s*:\s*\[([^\]]+)\]/);
+    let colorPalette: string[] = [];
+    if (colorPaletteMatch) {
+      colorPalette = colorPaletteMatch[1].split(',').map(c => 
+        c.trim().replace(/"/g, '').replace(/'/g, '')
+      );
+    }
+    
+    // Извлекаем items
+    const itemsMatch = jsonString.match(/"items"\s*:\s*\[([\s\S]*?)\]/);
+    let items: any[] = [];
+    if (itemsMatch) {
+      const itemsContent = itemsMatch[1];
+      // Простой парсинг items
+      const itemRegex = /\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g;
+      const itemMatches = itemsContent.match(itemRegex);
+      if (itemMatches) {
+        items = itemMatches.map(itemStr => {
+          try {
+            return JSON.parse(itemStr);
+          } catch {
+            // Ручной парсинг item
+            const itemName = itemStr.match(/"name"\s*:\s*"([^"]+)"/)?.[1] || '';
+            const itemCategory = itemStr.match(/"category"\s*:\s*"([^"]+)"/)?.[1] || '';
+            const itemPrice = itemStr.match(/"price"\s*:\s*"([^"]+)"/)?.[1] || '1000';
+            return {
+              name: itemName,
+              category: itemCategory,
+              price: itemPrice,
+              colors: ['Черный'],
+              style: 'Классический',
+              fit: 'Универсальный'
+            };
+          }
+        });
+      }
+    }
+    
+    return {
+      name: nameMatch?.[1] || 'Персональный образ',
+      description: descriptionMatch?.[1] || 'Создан специально для вас',
+      totalPrice: totalPriceMatch?.[1] || '5000 ₽',
+      styleNotes: styleNotesMatch?.[1] || 'Стильный и комфортный образ',
+      whyItWorks: whyItWorksMatch?.[1] || '',
+      colorPalette,
+      items
+    };
+  }
+
   private cleanJsonString(jsonString: string): string {
-    return jsonString
-      // Исправляем двойные кавычки в названиях полей
-      .replace(/"([^"]*)"([^"]*):/g, (match, p1, p2) => {
-        return `"${p1}${p2}":`;
-      })
-      // Исправляем кавычки в массивах цветов
-      .replace(/"colors":\s*\[([^\]]+)\]/g, (match, colors) => {
-        const fixedColors = colors.split(',').map(c => {
-          const cleanColor = c.trim().replace(/"/g, '');
-          return `"${cleanColor}"`;
-        }).join(', ');
-        return `"colors": [${fixedColors}]`;
-      })
-      // Исправляем кавычки в colorPalette
-      .replace(/"colorPalette":\s*\[([^\]]+)\]/g, (match, colors) => {
-        const fixedColors = colors.split(',').map(c => {
-          const cleanColor = c.trim().replace(/"/g, '');
-          return `"${cleanColor}"`;
-        }).join(', ');
-        return `"colorPalette": [${fixedColors}]`;
-      })
-      // Исправляем кавычки в строках с запятыми
-      .replace(/"([^"]*), ([^"]*)"/g, (match, p1, p2) => {
-        return `"${p1}, ${p2}"`;
-      })
-      // Исправляем кавычки в названиях полей
-      .replace(/"([^"]*):\s*([^"]*)"/g, (match, field, value) => {
-        return `"${field}": "${value}"`;
-      })
-      // Исправляем проблемные кавычки в значениях
-      .replace(/"([^"]*)"([^"]*)"([^"]*)"/g, (match, p1, p2, p3) => {
-        return `"${p1}${p2}${p3}"`;
-      });
+    console.log('🔧 Cleaning JSON string...');
+    
+    // Удаляем лишние пробелы и переносы строк
+    let cleaned = jsonString.trim();
+    
+    // Исправляем проблемные кавычки в массивах цветов
+    cleaned = cleaned.replace(/"colors":\s*\[([^\]]+)\]/g, (match, colors) => {
+      console.log('🎨 Fixing colors array:', colors);
+      const fixedColors = colors.split(',').map(c => {
+        const cleanColor = c.trim().replace(/"/g, '').replace(/'/g, '');
+        return `"${cleanColor}"`;
+      }).join(', ');
+      return `"colors": [${fixedColors}]`;
+    });
+    
+    // Исправляем кавычки в colorPalette
+    cleaned = cleaned.replace(/"colorPalette":\s*\[([^\]]+)\]/g, (match, colors) => {
+      console.log('🎨 Fixing colorPalette array:', colors);
+      const fixedColors = colors.split(',').map(c => {
+        const cleanColor = c.trim().replace(/"/g, '').replace(/'/g, '');
+        return `"${cleanColor}"`;
+      }).join(', ');
+      return `"colorPalette": [${fixedColors}]`;
+    });
+    
+    // Исправляем двойные кавычки в названиях полей
+    cleaned = cleaned.replace(/"([^"]*)"([^"]*):/g, (match, p1, p2) => {
+      return `"${p1}${p2}":`;
+    });
+    
+    // Исправляем кавычки в строках с запятыми
+    cleaned = cleaned.replace(/"([^"]*), ([^"]*)"/g, (match, p1, p2) => {
+      return `"${p1}, ${p2}"`;
+    });
+    
+    // Исправляем кавычки в названиях полей
+    cleaned = cleaned.replace(/"([^"]*):\s*([^"]*)"/g, (match, field, value) => {
+      return `"${field}": "${value}"`;
+    });
+    
+    // Исправляем проблемные кавычки в значениях
+    cleaned = cleaned.replace(/"([^"]*)"([^"]*)"([^"]*)"/g, (match, p1, p2, p3) => {
+      return `"${p1}${p2}${p3}"`;
+    });
+    
+    // Удаляем лишние кавычки в конце строк
+    cleaned = cleaned.replace(/"\s*,\s*"/g, '", "');
+    
+    console.log('✅ Cleaned JSON:', cleaned.substring(0, 200) + '...');
+    return cleaned;
   }
 
   private transformToGeneratedOutfit(parsed: any, request: OutfitRequest): GeneratedOutfit {
@@ -728,6 +843,8 @@ ${isMale ? `
   }
 
   simulateResponse(request: OutfitRequest): GeneratedOutfit {
+    console.log('🎭 Generating enhanced simulation outfit...');
+    
     const bodyTypeRecommendations = this.getBodyTypeRecommendations(request.bodyType);
     const seasonRecommendations = this.getSeasonRecommendations(request.season);
     const occasionRecommendations = this.getOccasionRecommendations(request.occasion);
@@ -737,18 +854,54 @@ ${isMale ? `
     const items = this.generateOutfitItems(request);
     const styleNotes = this.generateStyleNotes(request, bodyTypeRecommendations);
     
+    // Создаем более детальное описание
+    const gender = this.detectGender(request);
+    const description = this.generateDetailedDescription(request, gender);
+    
     return {
       id: `outfit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       name: outfitName,
-      description: `Персональный образ для ${request.bodyType} типа фигуры в стиле ${request.stylePreferences.join(', ')}`,
+      description: description,
       occasion: request.occasion,
       season: request.season,
       items: items,
       totalPrice: this.calculateTotalPrice(items),
       styleNotes: styleNotes,
       colorPalette: request.colorPreferences,
-      confidence: 0.9
+      confidence: 0.95
     };
+  }
+
+  private generateDetailedDescription(request: OutfitRequest, gender: 'male' | 'female'): string {
+    const { bodyType, occasion, season, stylePreferences } = request;
+    
+    const bodyTypeNames = {
+      'hourglass': 'песочные часы',
+      'inverted-triangle': 'перевернутый треугольник',
+      'triangle': 'треугольник',
+      'rectangle': 'прямоугольник',
+      'circle': 'круг',
+      'diamond': 'ромб'
+    };
+    
+    const occasionNames = {
+      'casual': 'повседневный',
+      'business': 'деловой',
+      'evening': 'вечерний'
+    };
+    
+    const seasonNames = {
+      'spring': 'весенний',
+      'summer': 'летний',
+      'autumn': 'осенний',
+      'winter': 'зимний'
+    };
+    
+    const bodyTypeName = bodyTypeNames[bodyType as keyof typeof bodyTypeNames] || bodyType;
+    const occasionName = occasionNames[occasion as keyof typeof occasionNames] || occasion;
+    const seasonName = seasonNames[season as keyof typeof seasonNames] || season;
+    
+    return `Стильный ${occasionName} образ для ${gender === 'female' ? 'женщины' : 'мужчины'} с фигурой типа "${bodyTypeName}". Образ создан с учетом ${seasonName} сезона и включает элементы стиля ${stylePreferences.join(', ')}. Все предметы гардероба подобраны с учетом особенностей фигуры и создают гармоничный, комфортный лук.`;
   }
 
   private generateOutfitName(request: OutfitRequest): string {
