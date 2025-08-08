@@ -1,4 +1,5 @@
 import { env, getValidApiKeys, hasValidAiKey, logConfig } from "@/config/env";
+import { findMatchingOutfit, OutfitTemplate } from "@/data/outfitDatabase";
 
 // Универсальный сервис для работы с разными AI провайдерами
 // Автоматически выбирает лучший доступный вариант
@@ -92,56 +93,104 @@ export class AIService {
             return false;
           }
           
+          console.log('🔍 Testing Gemini API...');
+          console.log(`🔑 Gemini API Key: ${this.apiKeys.gemini.substring(0, 10)}...`);
+          
           // Тестируем разные модели Gemini (актуальный список)
           const testModels = ['gemini-1.5-flash', 'gemini-1.5-pro'];
           
           for (const model of testModels) {
             try {
               console.log(`🧪 Testing Gemini model: ${model}`);
-              const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKeys.gemini}`, {
+              
+              // Сначала проверяем доступность модели
+              const modelUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}?key=${this.apiKeys.gemini}`;
+              console.log(`🔍 Checking model availability: ${model}`);
+              
+              const modelResponse = await fetch(modelUrl, {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                signal: AbortSignal.timeout(10000)
+              });
+              
+              console.log(`📡 Model check status: ${modelResponse.status}`);
+              
+              if (!modelResponse.ok) {
+                const errorText = await modelResponse.text();
+                console.error(`❌ Model ${model} not available:`, errorText);
+                
+                if (modelResponse.status === 429) {
+                  console.log('⏰ Rate limit hit during model check');
+                  console.log('💡 This might be due to:');
+                  console.log('   - Requests per minute limit');
+                  console.log('   - Requests per day limit');
+                  console.log('   - Concurrent requests limit');
+                  return false;
+                }
+                
+                continue; // Пробуем следующую модель
+              }
+              
+              const modelData = await modelResponse.json();
+              console.log(`✅ Model ${model} is available:`, modelData.name);
+              
+              // Теперь делаем простой тестовый запрос
+              const testUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKeys.gemini}`;
+              
+              const testBody = {
+                contents: [{
+                  parts: [{
+                    text: "Привет! Это тестовый запрос. Ответь одним словом: 'Работает'"
+                  }]
+                }],
+                generationConfig: {
+                  temperature: 0.1,
+                  maxOutputTokens: 10
+                }
+              };
+              
+              console.log(`🧪 Making test request to ${model}...`);
+              
+              const testResponse = await fetch(testUrl, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                  contents: [{
-                    parts: [{
-                      text: "Hello"
-                    }]
-                  }],
-                  generationConfig: {
-                    temperature: 0.1,
-                    maxOutputTokens: 10
-                  }
-                })
+                body: JSON.stringify(testBody),
+                signal: AbortSignal.timeout(15000)
               });
               
-                        if (response.ok) {
-            const data = await response.json();
-            console.log(`✅ Gemini (${model}): API test successful`);
-            return true;
-          } else {
-            const errorText = await response.text();
-            console.log(`❌ Gemini (${model}): API test failed - ${response.status}: ${errorText}`);
-            
-            // Анализируем ошибки для лучшего понимания
-            if (response.status === 503) {
-              console.log(`⚠️ Gemini (${model}): Service temporarily unavailable, trying next model...`);
-            } else if (response.status === 429) {
-              console.log(`⚠️ Gemini (${model}): Rate limit exceeded, trying next model...`);
-            } else if (response.status === 404) {
-              console.log(`⚠️ Gemini (${model}): Model not found, trying next model...`);
-            }
-            // Продолжаем тестировать следующую модель
-          }
+              console.log(`📡 Test response status: ${testResponse.status}`);
+              
+              if (!testResponse.ok) {
+                const errorText = await testResponse.text();
+                console.error(`❌ Test request failed for ${model}:`, errorText);
+                
+                if (testResponse.status === 429) {
+                  console.log('⏰ Rate limit exceeded during test');
+                  console.log('📊 Error details:', errorText);
+                  return false;
+                }
+                
+                continue; // Пробуем следующую модель
+              }
+              
+              const testData = await testResponse.json();
+              console.log(`✅ Test successful for ${model}:`, testData);
+              
+              return true; // Модель работает
+              
             } catch (error) {
-              console.log(`❌ Gemini (${model}): API test error:`, error);
-              // Продолжаем тестировать следующую модель
+              console.error(`❌ Error testing ${model}:`, error);
+              continue; // Пробуем следующую модель
             }
           }
           
-          console.log('❌ Gemini: All models failed, falling back to simulation');
+          console.log('❌ All Gemini models failed');
           return false;
+          
         case 'claude':
           const hasClaude = !!this.apiKeys.claude;
           console.log(`🔍 Testing Claude: ${hasClaude ? '✅ Available' : '❌ No API key'}`);
@@ -151,15 +200,15 @@ export class AIService {
           console.log(`🔍 Testing Cohere: ${hasCohere ? '✅ Available' : '❌ No API key'}`);
           return hasCohere;
         case 'local':
-          // Проверяем доступность локальной модели
-          const hasLocal = await this.testLocalModel();
-          console.log(`🔍 Testing Local: ${hasLocal ? '✅ Available' : '❌ Not available'}`);
-          return hasLocal;
+          return await this.testLocalModel();
+        case 'simulation':
+          console.log('🎭 Simulation mode is always available');
+          return true;
         default:
           return false;
       }
     } catch (error) {
-      console.warn(`❌ Provider ${provider} test failed:`, error);
+      console.error(`❌ Error testing provider ${provider}:`, error);
       return false;
     }
   }
@@ -178,6 +227,31 @@ export class AIService {
     const startTime = Date.now();
     
     try {
+      // Сначала проверяем, не превышен ли лимит Gemini
+      if (this.currentProvider === 'gemini') {
+        console.log('🔍 Checking Gemini API status before generation...');
+        try {
+          // Быстрая проверка доступности Gemini
+          const testUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash?key=${this.apiKeys.gemini}`;
+          const testResponse = await fetch(testUrl, { 
+            method: 'GET',
+            signal: AbortSignal.timeout(5000)
+          });
+          
+          if (testResponse.status === 429) {
+            console.log('⏰ Gemini API quota exceeded (429), switching to simulation mode immediately');
+            this.currentProvider = 'simulation';
+            return this.simulateResponse(request);
+          } else if (testResponse.status === 503) {
+            console.log('🔄 Gemini API temporarily unavailable (503), switching to simulation mode');
+            this.currentProvider = 'simulation';
+            return this.simulateResponse(request);
+          }
+        } catch (testError) {
+          console.log('⚠️ Gemini API test failed, proceeding with generation attempt...');
+        }
+      }
+      
       let result: GeneratedOutfit;
       
       switch (this.currentProvider) {
@@ -209,23 +283,34 @@ export class AIService {
 
       return result;
     } catch (error) {
-      console.error(`Error with ${this.currentProvider}:`, error);
+      console.error(`❌ Error with ${this.currentProvider}:`, error);
       
-      // Если ошибка связана с регионом/локацией, переключаемся на симуляцию
-      if (error.message && error.message.includes('location is not supported')) {
-        console.log('🔄 Switching to simulation mode due to regional restrictions');
+      // Улучшенная обработка ошибок
+      const errorMessage = error.message || error.toString();
+      
+      if (errorMessage.includes('location is not supported')) {
+        console.log('🌍 Switching to simulation mode due to regional restrictions');
         this.currentProvider = 'simulation';
-      } else if (error.message && error.message.includes('401')) {
+      } else if (errorMessage.includes('401')) {
         console.log('🔑 API key issue detected, switching to simulation mode');
         this.currentProvider = 'simulation';
-      } else if (error.message && error.message.includes('400')) {
+      } else if (errorMessage.includes('400')) {
         console.log('⚠️ Bad request detected, switching to simulation mode');
         this.currentProvider = 'simulation';
-      } else if (error.message && error.message.includes('503')) {
+      } else if (errorMessage.includes('503')) {
         console.log('🔄 Service unavailable (503), switching to simulation mode');
         this.currentProvider = 'simulation';
-      } else if (error.message && error.message.includes('429')) {
+      } else if (errorMessage.includes('429')) {
         console.log('⏰ Rate limit exceeded (429), switching to simulation mode');
+        this.currentProvider = 'simulation';
+      } else if (errorMessage.includes('quota')) {
+        console.log('💳 API quota exceeded, switching to simulation mode');
+        this.currentProvider = 'simulation';
+      } else if (errorMessage.includes('timeout')) {
+        console.log('⏱️ Request timeout, switching to simulation mode');
+        this.currentProvider = 'simulation';
+      } else {
+        console.log('❓ Unknown error, switching to simulation mode');
         this.currentProvider = 'simulation';
       }
       
@@ -268,21 +353,29 @@ export class AIService {
   }
 
   private async generateWithGemini(request: OutfitRequest): Promise<GeneratedOutfit> {
-    // Пробуем разные модели Gemini (актуальный список)
+    // Проверяем доступность Gemini API для региона
+    console.log('🌍 Checking Gemini API availability for your region...');
+    
+    // Список моделей с приоритетами (только те, что точно работают)
     const models = [
+      // Основные модели Gemini 1.5
       'gemini-1.5-flash',
-      'gemini-1.5-pro'
+      'gemini-1.5-pro',
+      'gemini-1.5-pro-latest'
     ];
     
     let lastError: Error | null = null;
+    let successfulModel: string | null = null;
+    
+    console.log('🤖 Trying Gemini models in order of preference...');
     
     for (const model of models) {
       // Пробуем каждую модель с retry
-      for (let attempt = 1; attempt <= 3; attempt++) {
+      for (let attempt = 1; attempt <= 2; attempt++) { // Уменьшили количество попыток
         try {
           // Добавляем задержку между попытками
           if (attempt > 1) {
-            const delay = attempt * 1000; // 1s, 2s, 3s
+            const delay = attempt * 1000; // 1s, 2s
             console.log(`⏳ Waiting ${delay}ms before retry ${attempt} for model ${model}`);
             await new Promise(resolve => setTimeout(resolve, delay));
           }
@@ -290,28 +383,32 @@ export class AIService {
           const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKeys.gemini}`;
           console.log(`🔄 Trying Gemini model: ${model} (attempt ${attempt})`);
           
+          // Адаптируем параметры под разные модели
+          const generationConfig = this.getGeminiConfigForModel(model);
+          
           const body = {
             contents: [{
               parts: [{
                 text: this.createPrompt(request)
               }]
             }],
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 1000
-            }
+            generationConfig
           };
 
-          console.log('🌐 Gemini API Request:', { url: url.replace(this.apiKeys.gemini, '***'), model });
+          console.log('🌐 Gemini API Request:', { 
+            url: url.replace(this.apiKeys.gemini, '***'), 
+            model,
+            config: generationConfig 
+          });
 
-                      const response = await fetch(url, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(body),
-              signal: AbortSignal.timeout(30000) // 30 секунд таймаут
-            });
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(20000) // Уменьшили таймаут до 20 секунд
+          });
 
           console.log('📡 Gemini API Response Status:', response.status);
 
@@ -321,13 +418,23 @@ export class AIService {
             
             // Обрабатываем специфические ошибки
             if (response.status === 503) {
-              console.log('🔄 Gemini API is temporarily unavailable (503), switching to simulation mode');
-              this.currentProvider = 'simulation';
-              return this.simulateResponse(request);
+              console.log(`🔄 Gemini API is temporarily unavailable (503) for ${model}, trying next model`);
+              break; // Переходим к следующей модели
             } else if (response.status === 429) {
-              console.log('⏰ Gemini API rate limit exceeded (429), switching to simulation mode');
-              this.currentProvider = 'simulation';
-              return this.simulateResponse(request);
+              console.log(`⏰ Gemini API rate limit exceeded (429) for ${model}, trying next model`);
+              break; // Переходим к следующей модели
+            } else if (response.status === 400) {
+              // Проверяем на географические ограничения
+              if (errorText.includes('User location is not supported') || errorText.includes('FAILED_PRECONDITION')) {
+                console.log(`🌍 Gemini API not available in your region for ${model}`);
+                console.log('💡 This is a geographic restriction. Consider using a VPN or switching to simulation mode.');
+                // Если это географическое ограничение, сразу переходим к симуляции
+                console.log('🔄 Switching to simulation mode due to geographic restrictions...');
+                this.currentProvider = 'simulation';
+                return this.simulateResponse(request);
+              }
+              console.log(`❌ Model ${model} not available or invalid, trying next model`);
+              break; // Переходим к следующей модели
             }
             
             lastError = new Error(`Gemini API error (${model}): ${response.status} - ${errorText}`);
@@ -344,11 +451,14 @@ export class AIService {
           }
           
           try {
-            return this.parseResponse(responseText, request);
+            const result = this.parseResponse(responseText, request);
+            successfulModel = model;
+            console.log(`🎉 Successfully generated outfit using ${model}`);
+            return result;
           } catch (parseError) {
             console.error(`❌ Failed to parse Gemini response (${model}):`, parseError);
             // Пробуем следующую модель
-            continue;
+            break;
           }
           
         } catch (error) {
@@ -364,8 +474,55 @@ export class AIService {
       }
     }
     
-    // Если все модели не работают, выбрасываем последнюю ошибку
-    throw lastError || new Error('All Gemini models failed');
+    // Если все модели не работают, переключаемся на симуляцию
+    console.log(`❌ All Gemini models failed. Last error: ${lastError?.message}`);
+    console.log('🔄 Switching to simulation mode...');
+    this.currentProvider = 'simulation';
+    return this.simulateResponse(request);
+  }
+
+  // Метод для получения оптимальной конфигурации для каждой модели
+  private getGeminiConfigForModel(model: string) {
+    const baseConfig = {
+      temperature: 0.7,
+      maxOutputTokens: 1000
+    };
+
+    // Специфичные настройки для разных моделей
+    switch (model) {
+      case 'gemini-2.0-flash-exp':
+      case 'gemini-2.0-flash':
+        return {
+          ...baseConfig,
+          temperature: 0.6, // Более стабильные результаты
+          maxOutputTokens: 1200 // Больше токенов для лучшего качества
+        };
+      
+      case 'gemini-2.0-pro':
+        return {
+          ...baseConfig,
+          temperature: 0.5, // Более консервативные настройки
+          maxOutputTokens: 1500 // Максимальное качество
+        };
+      
+      case 'gemini-1.5-pro':
+      case 'gemini-1.5-pro-latest':
+        return {
+          ...baseConfig,
+          temperature: 0.7,
+          maxOutputTokens: 1000
+        };
+      
+      case 'gemini-1.5-flash':
+        return {
+          ...baseConfig,
+          temperature: 0.8, // Более креативные результаты
+          maxOutputTokens: 800 // Быстрее, но меньше деталей
+        };
+      
+      default:
+        return baseConfig;
+    }
   }
 
   private async generateWithClaude(request: OutfitRequest): Promise<GeneratedOutfit> {
@@ -860,8 +1017,62 @@ ${isMale ? `
   }
 
   simulateResponse(request: OutfitRequest): GeneratedOutfit {
-    console.log('🎭 Generating enhanced simulation outfit...');
+    console.log('🎭 Generating enhanced simulation outfit based on user data...');
+    console.log('📊 User data:', {
+      bodyType: request.bodyType,
+      gender: request.measurements.gender,
+      style: request.stylePreferences,
+      colors: request.colorPreferences,
+      occasion: request.occasion,
+      season: request.season
+    });
     
+    // Сначала пытаемся найти подходящий образ в базе данных
+    const matchingOutfit = findMatchingOutfit(
+      request.measurements.gender,
+      request.bodyType,
+      request.stylePreferences,
+      request.occasion,
+      request.season
+    );
+    
+    if (matchingOutfit) {
+      console.log('✅ Found matching outfit in database:', matchingOutfit.name);
+      
+      // Конвертируем шаблон в GeneratedOutfit
+      const outfit: GeneratedOutfit = {
+        id: matchingOutfit.id,
+        name: matchingOutfit.name,
+        description: matchingOutfit.description,
+        occasion: request.occasion,
+        season: request.season,
+        items: matchingOutfit.items.map(item => ({
+          ...item,
+          // Адаптируем цвета под предпочтения пользователя
+          colors: request.colorPreferences.length > 0 
+            ? request.colorPreferences 
+            : item.colors
+        })),
+        totalPrice: matchingOutfit.totalPrice,
+        styleNotes: matchingOutfit.styleNotes,
+        colorPalette: request.colorPreferences.length > 0 
+          ? request.colorPreferences 
+          : matchingOutfit.colorPalette,
+        confidence: matchingOutfit.confidence
+      };
+      
+      console.log('🎨 Generated outfit from database:', {
+        name: outfit.name,
+        itemsCount: outfit.items.length,
+        items: outfit.items.map(item => `${item.category}: ${item.name}`)
+      });
+      
+      return outfit;
+    }
+    
+    console.log('⚠️ No matching outfit found in database, using fallback generation...');
+    
+    // Fallback к старой логике генерации
     const bodyTypeRecommendations = this.getBodyTypeRecommendations(request.bodyType);
     const seasonRecommendations = this.getSeasonRecommendations(request.season);
     const occasionRecommendations = this.getOccasionRecommendations(request.occasion);
@@ -875,7 +1086,7 @@ ${isMale ? `
     const gender = this.detectGender(request);
     const description = this.generateDetailedDescription(request, gender);
     
-    return {
+    const outfit = {
       id: `outfit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       name: outfitName,
       description: description,
@@ -885,8 +1096,16 @@ ${isMale ? `
       totalPrice: this.calculateTotalPrice(items),
       styleNotes: styleNotes,
       colorPalette: request.colorPreferences,
-      confidence: 0.95
+      confidence: 0.85 // Немного ниже, так как это fallback
     };
+    
+    console.log('🎨 Generated fallback outfit:', {
+      name: outfit.name,
+      itemsCount: outfit.items.length,
+      items: outfit.items.map(item => `${item.category}: ${item.name}`)
+    });
+    
+    return outfit;
   }
 
   private generateDetailedDescription(request: OutfitRequest, gender: 'male' | 'female'): string {
@@ -937,6 +1156,8 @@ ${isMale ? `
     const items = [];
     const style = request.stylePreferences[0] || 'casual';
     const gender = this.detectGender(request);
+    
+    console.log(`👕 Generating outfit items for ${gender} with ${style} style...`);
     
     if (gender === 'male') {
       // Мужские образы
@@ -1081,6 +1302,7 @@ ${isMale ? `
       });
     }
     
+    console.log(`✅ Generated ${items.length} outfit items:`, items.map(item => `${item.category}: ${item.name}`));
     return items;
   }
 

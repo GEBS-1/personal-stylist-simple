@@ -117,6 +117,8 @@ class WildberriesService {
         offset: '0'
       });
 
+      console.log(`🌐 Making proxy request to: ${proxyUrl}`);
+      
       const response = await fetch(`${proxyUrl}?${proxyParams}`, {
         headers: {
           'Accept': 'application/json',
@@ -129,6 +131,13 @@ class WildberriesService {
       
       if (!response.ok) {
         console.log(`❌ Proxy failed: ${response.status} ${response.statusText}`);
+        
+        // Если прокси недоступен, сразу переходим к симуляции
+        if (response.status === 404 || response.status === 500) {
+          console.log('🔄 Proxy server error, switching to simulated products');
+          return this.searchByKeywords(params);
+        }
+        
         return [];
       }
 
@@ -142,6 +151,22 @@ class WildberriesService {
       
     } catch (error) {
       console.log(`❌ Proxy error:`, error);
+      
+      // Обрабатываем специфические сетевые ошибки
+      const errorMessage = error.message || error.toString();
+      
+      if (errorMessage.includes('ERR_TUNNEL_CONNECTION_FAILED')) {
+        console.log('🌐 Tunnel connection failed - network/proxy issue');
+      } else if (errorMessage.includes('ERR_CERT_COMMON_NAME_INVALID')) {
+        console.log('🔒 SSL certificate issue detected');
+      } else if (errorMessage.includes('timeout')) {
+        console.log('⏱️ Request timeout');
+      } else if (errorMessage.includes('fetch')) {
+        console.log('🌐 Network fetch error');
+      }
+      
+      console.log('🔄 Switching to simulated products due to network issues');
+      return this.searchByKeywords(params);
     }
     
     console.log(`❌ Proxy search failed, falling back to direct API`);
@@ -164,6 +189,8 @@ class WildberriesService {
         locale: 'ru'
       });
 
+      console.log('🌐 Attempting direct API call...');
+      
       const response = await fetch(`https://search.wb.ru/exactmatch/ru/common/v4/search?${apiParams}`, {
         headers: {
           'Accept': 'application/json',
@@ -176,13 +203,23 @@ class WildberriesService {
       if (response.ok) {
         const data = await response.json();
         if (data.data?.products && data.data.products.length > 0) {
+          console.log(`✅ Found ${data.data.products.length} products via direct API`);
           return this.parseProducts(data.data.products, params);
         }
       }
     } catch (error) {
       console.warn('❌ Main API search completely failed:', error);
-      return [];
+      
+      // Обрабатываем сетевые ошибки
+      const errorMessage = error.message || error.toString();
+      if (errorMessage.includes('CORS') || errorMessage.includes('blocked')) {
+        console.log('🚫 CORS blocked - expected for direct API calls');
+      }
     }
+    
+    // Финальный fallback к симуляции
+    console.log('🎭 All real API attempts failed, using simulated products');
+    return this.searchByKeywords(params);
   }
 
   private async searchWithWebScraping(params: SearchParams): Promise<Product[]> {
