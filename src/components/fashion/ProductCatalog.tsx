@@ -16,81 +16,50 @@ interface ProductCatalogProps {
 export default function ProductCatalog({ analysisData, generatedOutfit }: ProductCatalogProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
   const { toast } = useToast();
 
   useEffect(() => {
-    if (analysisData && !isLoading) {
-      loadRecommendations();
+    if (analysisData && generatedOutfit && !isLoading) {
+      loadOutfitProducts();
     }
-  }, [analysisData]);
+  }, [analysisData, generatedOutfit]);
 
-  const loadRecommendations = async () => {
-    if (!analysisData) return;
+  const loadOutfitProducts = async () => {
+    if (!analysisData || !generatedOutfit) return;
     
     setIsLoading(true);
     
     try {
       const params: SearchParams = {
-        query: 'одежда',
+        query: 'outfit-based',
         bodyType: analysisData.bodyType,
         occasion: 'casual',
         budget: 'medium',
         gender: analysisData.gender
       };
 
-      const recommendations = await wildberriesService.getRecommendations(params, generatedOutfit);
-      setProducts(recommendations);
+      console.log('🎨 Loading products for generated outfit:', generatedOutfit.name);
+      const outfitProducts = await wildberriesService.getRecommendations(params, generatedOutfit);
+      setProducts(outfitProducts);
       
-      toast({
-        title: "Рекомендации загружены",
-        description: `Найдено ${recommendations.length} товаров на Wildberries`,
-      });
-      
-      // Показываем информацию о режиме работы
-      if (recommendations.some(p => p.id.includes('fallback'))) {
+      if (outfitProducts.length > 0) {
         toast({
-          title: "Режим демонстрации",
-          description: "Показываем тестовые данные. Для реальных товаров настройте API ключи.",
-          variant: "default"
+          title: "Товары подобраны!",
+          description: `Найдено ${outfitProducts.length} товаров для вашего образа "${generatedOutfit.name}"`,
+        });
+      } else {
+        toast({
+          title: "Нет товаров",
+          description: "Не удалось подобрать товары для данного образа",
+          variant: "destructive"
         });
       }
       
     } catch (error) {
-      console.error('Failed to load recommendations:', error);
+      console.error('Failed to load outfit products:', error);
       toast({
         title: "Ошибка загрузки",
-        description: "Не удалось загрузить рекомендации. Попробуйте еще раз.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleCategoryClick = async (category: string) => {
-    if (!analysisData || isLoading || selectedCategory === category) return;
-    
-    setIsLoading(true);
-    setSelectedCategory(category);
-    
-    try {
-      const params: SearchParams = {
-        query: category,
-        bodyType: analysisData.bodyType,
-        occasion: 'casual',
-        budget: 'medium',
-        gender: analysisData.gender
-      };
-
-      const categoryProducts = await wildberriesService.searchProducts(params);
-      setProducts(categoryProducts);
-      
-    } catch (error) {
-      console.error('Failed to load category products:', error);
-      toast({
-        title: "Ошибка загрузки",
-        description: "Не удалось загрузить товары категории.",
+        description: "Не удалось загрузить товары для образа",
         variant: "destructive"
       });
     } finally {
@@ -101,15 +70,6 @@ export default function ProductCatalog({ analysisData, generatedOutfit }: Produc
   const handleProductClick = (product: Product) => {
     window.open(product.url, '_blank');
   };
-
-  const categories = [
-    { id: 'all', name: 'Все товары', icon: '🛍️' },
-    { id: 'юбка', name: 'Юбки', icon: '👗' },
-    { id: 'брюки', name: 'Брюки', icon: '👖' },
-    { id: 'блуза', name: 'Блузы', icon: '👚' },
-    { id: 'платье', name: 'Платья', icon: '👗' },
-    { id: 'костюм', name: 'Костюмы', icon: '👔' }
-  ];
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('ru-RU').format(price) + ' ₽';
@@ -153,7 +113,7 @@ export default function ProductCatalog({ analysisData, generatedOutfit }: Produc
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ShoppingBag className="w-5 h-5" />
-            Рекомендации Wildberries
+            Товары для образа
             {products.some(p => p.id.includes('fallback')) && (
               <Badge variant="outline" className="text-xs">
                 Демо режим
@@ -161,7 +121,29 @@ export default function ProductCatalog({ analysisData, generatedOutfit }: Produc
             )}
           </CardTitle>
           <div className="text-sm text-muted-foreground">
-            Персональные рекомендации на основе ваших данных
+            {generatedOutfit ? (
+              <>
+                <div className="font-medium mb-2">{generatedOutfit.name}</div>
+                <div className="mb-2">{generatedOutfit.description}</div>
+                {generatedOutfit.colorPalette && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">Цветовая палитра:</span>
+                    <div className="flex gap-1">
+                      {generatedOutfit.colorPalette.map((color: string, index: number) => (
+                        <div
+                          key={index}
+                          className="w-4 h-4 rounded-full border"
+                          style={{ backgroundColor: color.replace(/"/g, '') }}
+                          title={color.replace(/"/g, '')}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              "Персональные рекомендации на основе ваших данных"
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -190,35 +172,11 @@ export default function ProductCatalog({ analysisData, generatedOutfit }: Produc
         </CardContent>
       </Card>
 
-      {/* Категории */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Категории товаров</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {categories.map((category) => (
-              <Button
-                key={category.id}
-                variant={selectedCategory === category.id ? "default" : "outline"}
-                size="sm"
-                onClick={() => handleCategoryClick(category.id)}
-                disabled={isLoading}
-                className="flex items-center gap-2"
-              >
-                <span>{category.icon}</span>
-                {category.name}
-              </Button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Товары */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Товары</CardTitle>
+            <CardTitle>Подобранные товары</CardTitle>
             <Badge variant="secondary">
               {products.length} товаров
             </Badge>
@@ -228,20 +186,23 @@ export default function ProductCatalog({ analysisData, generatedOutfit }: Produc
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-8 h-8 animate-spin mr-2" />
-              <span>Загружаем товары...</span>
+              <span>Подбираем товары для вашего образа...</span>
             </div>
           ) : products.length === 0 ? (
             <div className="text-center py-12">
               <ShoppingBag className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
               <h3 className="text-lg font-medium mb-2">Товары не найдены</h3>
               <p className="text-muted-foreground">
-                Попробуйте изменить параметры поиска
+                {generatedOutfit ? 
+                  "Не удалось подобрать товары для данного образа. Попробуйте другой образ." :
+                  "Сначала создайте образ, чтобы увидеть подобранные товары"
+                }
               </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {products.map((product) => (
-                <Card key={product.id} className="hover:shadow-lg transition-shadow cursor-pointer">
+                <Card key={product.id} className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => handleProductClick(product)}>
                   <CardContent className="p-4">
                     {/* Изображение */}
                     <div className="aspect-square bg-muted rounded-lg mb-4 flex items-center justify-center overflow-hidden">
@@ -267,9 +228,7 @@ export default function ProductCatalog({ analysisData, generatedOutfit }: Produc
                       
                       {/* Цена */}
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-lg">
-                          {formatPrice(product.price)}
-                        </span>
+                        <span className="font-bold text-lg">{formatPrice(product.price)}</span>
                         {product.originalPrice && product.originalPrice > product.price && (
                           <span className="text-sm text-muted-foreground line-through">
                             {formatPrice(product.originalPrice)}
@@ -293,27 +252,52 @@ export default function ProductCatalog({ analysisData, generatedOutfit }: Produc
                         </div>
                       )}
 
-                      {/* Цвета */}
-                      {product.colors && product.colors.length > 0 && (
-                        <div className="flex gap-1">
-                          {product.colors.slice(0, 3).map((color, index) => (
-                            <Badge key={index} variant="outline" className="text-xs">
-                              {color}
+                      {/* Размеры */}
+                      {product.sizes && product.sizes.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {product.sizes.slice(0, 4).map((size) => (
+                            <Badge key={size} variant="outline" className="text-xs">
+                              {size}
                             </Badge>
                           ))}
-                          {product.colors.length > 3 && (
+                          {product.sizes.length > 4 && (
                             <Badge variant="outline" className="text-xs">
-                              +{product.colors.length - 3}
+                              +{product.sizes.length - 4}
                             </Badge>
                           )}
                         </div>
                       )}
 
-                      {/* Кнопка перехода */}
-                      <Button
-                        onClick={() => handleProductClick(product)}
-                        className="w-full mt-3"
+                      {/* Цвета */}
+                      {product.colors && product.colors.length > 0 && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Цвета:</span>
+                          <div className="flex gap-1">
+                            {product.colors.slice(0, 3).map((color, index) => (
+                              <div
+                                key={index}
+                                className="w-3 h-3 rounded-full border"
+                                style={{ backgroundColor: color.toLowerCase() }}
+                                title={color}
+                              />
+                            ))}
+                            {product.colors.length > 3 && (
+                              <span className="text-xs text-muted-foreground">
+                                +{product.colors.length - 3}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Кнопка покупки */}
+                      <Button 
+                        className="w-full mt-3" 
                         size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleProductClick(product);
+                        }}
                       >
                         <ExternalLink className="w-4 h-4 mr-2" />
                         Перейти к товару

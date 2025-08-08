@@ -333,7 +333,7 @@ export class AdvancedWildberriesService {
     for (const endpoint of categoryEndpoints) {
       for (const category of categories) {
         try {
-          const params = new URLSearchParams({
+          const searchParams = new URLSearchParams({
             TestGroup: 'no_test',
             TestID: 'no_test',
             appType: '1',
@@ -348,7 +348,7 @@ export class AdvancedWildberriesService {
             locale: 'ru'
           });
 
-          const response = await fetch(`${endpoint}?${params}`, {
+          const response = await fetch(`${endpoint}?${searchParams}`, {
             method: 'GET',
             headers: {
               'Accept': 'application/json',

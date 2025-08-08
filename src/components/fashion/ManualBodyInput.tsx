@@ -117,14 +117,9 @@ export const ManualBodyInput = ({ onComplete, onContinue, analysisData }: Manual
     setTimeout(() => validateForm(), 100);
   };
 
-  const handleSubmit = () => {
+  const handleSaveAndContinue = () => {
     if (validateForm()) {
       onComplete(formData);
-    }
-  };
-
-  const handleContinue = () => {
-    if (isValid) {
       onContinue();
     }
   };
@@ -330,26 +325,16 @@ export const ManualBodyInput = ({ onComplete, onContinue, analysisData }: Manual
         </CardContent>
       </Card>
 
-      {/* Кнопки действий */}
-      <div className="flex justify-center gap-4">
+      {/* Кнопка действий */}
+      <div className="flex justify-center">
         <Button
-          onClick={handleSubmit}
+          onClick={handleSaveAndContinue}
           disabled={!isValid}
-          className="min-w-32"
+          className="min-w-48"
         >
           <CheckCircle className="w-4 h-4 mr-2" />
-          Сохранить данные
+          Сохранить данные и продолжить
         </Button>
-        
-        {isValid && (
-          <Button
-            onClick={handleContinue}
-            variant="default"
-            className="min-w-32"
-          >
-            Продолжить
-          </Button>
-        )}
       </div>
 
       {/* Статус валидации */}

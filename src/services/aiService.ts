@@ -221,6 +221,12 @@ export class AIService {
       } else if (error.message && error.message.includes('400')) {
         console.log('⚠️ Bad request detected, switching to simulation mode');
         this.currentProvider = 'simulation';
+      } else if (error.message && error.message.includes('503')) {
+        console.log('🔄 Service unavailable (503), switching to simulation mode');
+        this.currentProvider = 'simulation';
+      } else if (error.message && error.message.includes('429')) {
+        console.log('⏰ Rate limit exceeded (429), switching to simulation mode');
+        this.currentProvider = 'simulation';
       }
       
       // Fallback к симуляции
@@ -312,6 +318,18 @@ export class AIService {
           if (!response.ok) {
             const errorText = await response.text();
             console.error(`❌ Gemini API Error (${model}):`, errorText);
+            
+            // Обрабатываем специфические ошибки
+            if (response.status === 503) {
+              console.log('🔄 Gemini API is temporarily unavailable (503), switching to simulation mode');
+              this.currentProvider = 'simulation';
+              return this.simulateResponse(request);
+            } else if (response.status === 429) {
+              console.log('⏰ Gemini API rate limit exceeded (429), switching to simulation mode');
+              this.currentProvider = 'simulation';
+              return this.simulateResponse(request);
+            }
+            
             lastError = new Error(`Gemini API error (${model}): ${response.status} - ${errorText}`);
             continue; // Пробуем следующую попытку
           }

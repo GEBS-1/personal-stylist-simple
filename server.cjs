@@ -9,6 +9,11 @@ const PORT = 3001;
 app.use(cors());
 app.use(express.json());
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', message: 'Server is running', timestamp: new Date().toISOString() });
+});
+
 // Функция для генерации URL изображений Wildberries
 function getProductImageUrl(productId) {
   if (!productId) return '/placeholder.svg';
