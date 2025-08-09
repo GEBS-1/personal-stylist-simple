@@ -8,10 +8,10 @@ import { wildberriesService } from '@/services/wildberriesService';
 
 interface OutfitGeneratorProps {
   analysisData: any;
-  onOutfitGenerated: (outfit: any) => void;
+  onComplete: (outfit: any) => void;
 }
 
-export const OutfitGenerator: React.FC<OutfitGeneratorProps> = ({ analysisData, onOutfitGenerated }) => {
+export const OutfitGenerator: React.FC<OutfitGeneratorProps> = ({ analysisData, onComplete }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedOutfit, setGeneratedOutfit] = useState<any>(null);
   const [currentProvider, setCurrentProvider] = useState<string>('simulation');
@@ -57,9 +57,26 @@ export const OutfitGenerator: React.FC<OutfitGeneratorProps> = ({ analysisData, 
   const generateOutfit = async () => {
     setIsGenerating(true);
     try {
-      const outfit = await aiService.generateOutfit(analysisData);
+      // Преобразуем analysisData в формат OutfitRequest
+      const outfitRequest = {
+        bodyType: analysisData?.bodyType || 'hourglass',
+        measurements: {
+          height: analysisData?.height || 165,
+          weight: analysisData?.weight || 60,
+          gender: analysisData?.gender || 'female',
+          season: analysisData?.season || 'spring',
+          shoeSize: analysisData?.shoeSize || 38
+        },
+        stylePreferences: analysisData?.stylePreferences || ['casual'],
+        colorPreferences: analysisData?.colorPreferences || ['black', 'white'],
+        occasion: analysisData?.occasion || 'casual',
+        season: analysisData?.season || 'spring',
+        budget: analysisData?.budget || 'medium'
+      };
+      
+      const outfit = await aiService.generateOutfit(outfitRequest);
       setGeneratedOutfit(outfit);
-      onOutfitGenerated(outfit);
+      onComplete(outfit);
       setCurrentProvider(await aiService.getCurrentProvider());
     } catch (error) {
       console.error('Error generating outfit:', error);

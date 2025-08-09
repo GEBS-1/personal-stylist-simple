@@ -42,22 +42,30 @@ export const isValidApiKey = (key: string): boolean => {
   );
 };
 
-// Получение валидных API ключей
-export const getValidApiKeys = () => {
+export function getValidApiKeys() {
   return {
-    gemini: isValidApiKey(env.GEMINI_API_KEY) ? env.GEMINI_API_KEY : '',
-    openai: isValidApiKey(env.OPENAI_API_KEY) ? env.OPENAI_API_KEY : '',
-    claude: isValidApiKey(env.CLAUDE_API_KEY) ? env.CLAUDE_API_KEY : '',
-    cohere: isValidApiKey(env.COHERE_API_KEY) ? env.COHERE_API_KEY : '',
-    wildberries: isValidApiKey(env.WILDBERRIES_API_KEY) ? env.WILDBERRIES_API_KEY : '',
+    openai: import.meta.env.VITE_OPENAI_API_KEY || '',
+    gemini: import.meta.env.VITE_GEMINI_API_KEY || '',
+    claude: import.meta.env.VITE_CLAUDE_API_KEY || '',
+    cohere: import.meta.env.VITE_COHERE_API_KEY || '',
+    // Добавляем GigaChat
+    gigachat: {
+      clientId: import.meta.env.VITE_GIGACHAT_CLIENT_ID || '',
+      clientSecret: import.meta.env.VITE_GIGACHAT_CLIENT_SECRET || ''
+    }
   };
-};
+}
 
-// Проверка наличия хотя бы одного валидного AI ключа
-export const hasValidAiKey = (): boolean => {
+export function hasValidAiKey() {
   const keys = getValidApiKeys();
-  return !!(keys.gemini || keys.openai || keys.claude || keys.cohere);
-};
+  return !!(
+    keys.openai ||
+    keys.gemini ||
+    keys.claude ||
+    keys.cohere ||
+    (keys.gigachat.clientId && keys.gigachat.clientSecret)
+  );
+}
 
 // Логирование конфигурации (только в development)
 export const logConfig = () => {
@@ -73,7 +81,7 @@ export const logConfig = () => {
     console.log(`  OpenAI: ${keys.openai ? '✅ Valid' : '❌ Missing/Invalid'}`);
     console.log(`  Claude: ${keys.claude ? '✅ Valid' : '❌ Missing/Invalid'}`);
     console.log(`  Cohere: ${keys.cohere ? '✅ Valid' : '❌ Missing/Invalid'}`);
-    console.log(`  Wildberries: ${keys.wildberries ? '✅ Valid' : '❌ Missing/Invalid'}`);
+    console.log(`  GigaChat: ${keys.gigachat.clientId && keys.gigachat.clientSecret ? '✅ Valid' : '❌ Missing/Invalid'}`);
     
     console.log('🛍️ Marketplace Settings:');
     console.log(`  Ozon: ${env.ENABLE_OZON ? '✅ Enabled' : '❌ Disabled'}`);

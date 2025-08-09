@@ -1,5 +1,6 @@
 import { env, getValidApiKeys, hasValidAiKey, logConfig } from "@/config/env";
 import { findMatchingOutfit, OutfitTemplate } from "@/data/outfitDatabase";
+import { createGigaChatService, GigaChatService } from "./gigaChatService";
 
 // Универсальный сервис для работы с разными AI провайдерами
 // Автоматически выбирает лучший доступный вариант
@@ -33,16 +34,18 @@ export interface GeneratedOutfit {
   confidence: number;
 }
 
-type AIProvider = 'openai' | 'gemini' | 'claude' | 'cohere' | 'local' | 'simulation';
+type AIProvider = 'openai' | 'gemini' | 'claude' | 'cohere' | 'local' | 'simulation' | 'gigachat';
 
 export class AIService {
   private currentProvider: AIProvider = 'simulation';
   private apiKeys: ReturnType<typeof getValidApiKeys>;
   private responseTimes: Partial<Record<AIProvider, number[]>> = {};
+  private gigaChatService: GigaChatService | null = null;
 
   constructor() {
     console.log('🚀 Initializing AI Service...');
     this.loadAPIKeys();
+    this.gigaChatService = createGigaChatService();
     this.initializeProvider();
   }
 
@@ -57,158 +60,198 @@ export class AIService {
   private async initializeProvider() {
     console.log('🔧 Initializing AI provider...');
     
-    // Проверяем только Gemini и симуляцию
-    const providers: AIProvider[] = ['gemini', 'simulation'];
+    // Используем только GigaChat по требованию пользователя
+    const providers: AIProvider[] = [
+      'gigachat',    // 🥇 Единственный активный провайдер - GigaChat
+      'simulation'   // 🎭 Fallback - только если GigaChat недоступен
+    ];
     
     for (const provider of providers) {
-      console.log(`🔍 Testing ${provider}...`);
-      if (await this.testProvider(provider)) {
+      console.log(`🧪 Testing ${provider}...`);
+      const isAvailable = await this.testProvider(provider);
+      
+      if (isAvailable) {
         this.currentProvider = provider;
-        console.log(`✅ Using AI provider: ${provider}`);
-        break;
+        console.log(`✅ Selected ${provider} as AI provider`);
+        return;
       }
+      
+      console.log(`❌ ${provider} is not available`);
     }
     
-    // Если Gemini не работает, используем симуляцию
-    if (this.currentProvider === 'simulation') {
-      console.log('🎭 Using simulation mode');
-      console.log('💡 Tips:');
-      console.log('  - Gemini API может быть временно недоступен');
-      console.log('  - Проверьте лимиты запросов в Google AI Studio');
-      console.log('  - Попробуйте позже или используйте другой API ключ');
-    }
+    // Если ничего не работает, используем симуляцию
+    this.currentProvider = 'simulation';
+    console.log('🎭 Using simulation mode as fallback');
   }
 
   private async testProvider(provider: AIProvider): Promise<boolean> {
+    console.log(`🧪 Testing ${provider} provider...`);
+    
     try {
       switch (provider) {
-        case 'openai':
-          const hasOpenAI = !!this.apiKeys.openai;
-          console.log(`🔍 Testing OpenAI: ${hasOpenAI ? '✅ Available' : '❌ No API key'}`);
-          return hasOpenAI;
-        case 'gemini':
-          const hasGemini = !!this.apiKeys.gemini;
-          if (!hasGemini) {
-            console.log('❌ Gemini: No API key');
-            return false;
-          }
-          
-          console.log('🔍 Testing Gemini API...');
-          console.log(`🔑 Gemini API Key: ${this.apiKeys.gemini.substring(0, 10)}...`);
-          
-          // Тестируем разные модели Gemini (актуальный список)
-          const testModels = ['gemini-1.5-flash', 'gemini-1.5-pro'];
-          
-          for (const model of testModels) {
-            try {
-              console.log(`🧪 Testing Gemini model: ${model}`);
-              
-              // Сначала проверяем доступность модели
-              const modelUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}?key=${this.apiKeys.gemini}`;
-              console.log(`🔍 Checking model availability: ${model}`);
-              
-              const modelResponse = await fetch(modelUrl, {
-                method: 'GET',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                signal: AbortSignal.timeout(10000)
-              });
-              
-              console.log(`📡 Model check status: ${modelResponse.status}`);
-              
-              if (!modelResponse.ok) {
-                const errorText = await modelResponse.text();
-                console.error(`❌ Model ${model} not available:`, errorText);
-                
-                if (modelResponse.status === 429) {
-                  console.log('⏰ Rate limit hit during model check');
-                  console.log('💡 This might be due to:');
-                  console.log('   - Requests per minute limit');
-                  console.log('   - Requests per day limit');
-                  console.log('   - Concurrent requests limit');
-                  return false;
-                }
-                
-                continue; // Пробуем следующую модель
-              }
-              
-              const modelData = await modelResponse.json();
-              console.log(`✅ Model ${model} is available:`, modelData.name);
-              
-              // Теперь делаем простой тестовый запрос
-              const testUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKeys.gemini}`;
-              
-              const testBody = {
-                contents: [{
-                  parts: [{
-                    text: "Привет! Это тестовый запрос. Ответь одним словом: 'Работает'"
-                  }]
-                }],
-                generationConfig: {
-                  temperature: 0.1,
-                  maxOutputTokens: 10
-                }
-              };
-              
-              console.log(`🧪 Making test request to ${model}...`);
-              
-              const testResponse = await fetch(testUrl, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(testBody),
-                signal: AbortSignal.timeout(15000)
-              });
-              
-              console.log(`📡 Test response status: ${testResponse.status}`);
-              
-              if (!testResponse.ok) {
-                const errorText = await testResponse.text();
-                console.error(`❌ Test request failed for ${model}:`, errorText);
-                
-                if (testResponse.status === 429) {
-                  console.log('⏰ Rate limit exceeded during test');
-                  console.log('📊 Error details:', errorText);
-                  return false;
-                }
-                
-                continue; // Пробуем следующую модель
-              }
-              
-              const testData = await testResponse.json();
-              console.log(`✅ Test successful for ${model}:`, testData);
-              
-              return true; // Модель работает
-              
-            } catch (error) {
-              console.error(`❌ Error testing ${model}:`, error);
-              continue; // Пробуем следующую модель
-            }
-          }
-          
-          console.log('❌ All Gemini models failed');
-          return false;
-          
-        case 'claude':
-          const hasClaude = !!this.apiKeys.claude;
-          console.log(`🔍 Testing Claude: ${hasClaude ? '✅ Available' : '❌ No API key'}`);
-          return hasClaude;
-        case 'cohere':
-          const hasCohere = !!this.apiKeys.cohere;
-          console.log(`🔍 Testing Cohere: ${hasCohere ? '✅ Available' : '❌ No API key'}`);
-          return hasCohere;
-        case 'local':
-          return await this.testLocalModel();
+        case 'gigachat':
+          return await this.testGigaChat();
         case 'simulation':
-          console.log('🎭 Simulation mode is always available');
-          return true;
+          return true; // Симуляция всегда доступна
         default:
+          // Все остальные провайдеры отключены по требованию пользователя
+          console.log(`🚫 ${provider} is disabled - using only GigaChat`);
           return false;
       }
     } catch (error) {
-      console.error(`❌ Error testing provider ${provider}:`, error);
+      console.error(`❌ ${provider} test failed:`, error);
+      return false;
+    }
+  }
+
+  private async testOpenAI(): Promise<boolean> {
+    const hasOpenAI = !!this.apiKeys.openai;
+    console.log(`🔍 Testing OpenAI: ${hasOpenAI ? '✅ Available' : '❌ No API key'}`);
+    return hasOpenAI;
+  }
+
+  private async testGemini(): Promise<boolean> {
+    const hasGemini = !!this.apiKeys.gemini;
+    if (!hasGemini) {
+      console.log('❌ Gemini: No API key');
+      return false;
+    }
+    
+    console.log('🔍 Testing Gemini API...');
+    console.log(`�� Gemini API Key: ${this.apiKeys.gemini.substring(0, 10)}...`);
+    
+    // Тестируем разные модели Gemini (актуальный список)
+    const testModels = ['gemini-1.5-flash', 'gemini-1.5-pro'];
+    
+    for (const model of testModels) {
+      try {
+        console.log(`🧪 Testing Gemini model: ${model}`);
+        
+        // Сначала проверяем доступность модели
+        const modelUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}?key=${this.apiKeys.gemini}`;
+        console.log(`🔍 Checking model availability: ${model}`);
+        
+        const modelResponse = await fetch(modelUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          signal: AbortSignal.timeout(10000)
+        });
+        
+        console.log(`📡 Model check status: ${modelResponse.status}`);
+        
+        if (!modelResponse.ok) {
+          const errorText = await modelResponse.text();
+          console.error(`❌ Model ${model} not available:`, errorText);
+          
+          if (modelResponse.status === 429) {
+            console.log('⏰ Rate limit hit during model check');
+            console.log('💡 This might be due to:');
+            console.log('   - Requests per minute limit');
+            console.log('   - Requests per day limit');
+            console.log('   - Concurrent requests limit');
+            return false;
+          }
+          
+          continue; // Пробуем следующую модель
+        }
+        
+        const modelData = await modelResponse.json();
+        console.log(`✅ Model ${model} is available:`, modelData.name);
+        
+        // Теперь делаем простой тестовый запрос
+        const testUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKeys.gemini}`;
+        
+        const testBody = {
+          contents: [{
+            parts: [{
+              text: "Привет! Это тестовый запрос. Ответь одним словом: 'Работает'"
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 10
+          }
+        };
+        
+        console.log(`🧪 Making test request to ${model}...`);
+        
+        const testResponse = await fetch(testUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(testBody),
+          signal: AbortSignal.timeout(15000)
+        });
+        
+        console.log(`📡 Test response status: ${testResponse.status}`);
+        
+        if (!testResponse.ok) {
+          const errorText = await testResponse.text();
+          console.error(`❌ Test request failed for ${model}:`, errorText);
+          
+          if (testResponse.status === 429) {
+            console.log('⏰ Rate limit exceeded during test');
+            console.log('📊 Error details:', errorText);
+            return false;
+          }
+          
+          continue; // Пробуем следующую модель
+        }
+        
+        const testData = await testResponse.json();
+        console.log(`✅ Test successful for ${model}:`, testData);
+        
+        return true; // Модель работает
+        
+      } catch (error) {
+        console.error(`❌ Error testing ${model}:`, error);
+        continue; // Пробуем следующую модель
+      }
+    }
+    
+    console.log('❌ All Gemini models failed');
+    return false;
+  }
+
+  private async testClaude(): Promise<boolean> {
+    const hasClaude = !!this.apiKeys.claude;
+    console.log(`🔍 Testing Claude: ${hasClaude ? '✅ Available' : '❌ No API key'}`);
+    return hasClaude;
+  }
+
+  private async testCohere(): Promise<boolean> {
+    const hasCohere = !!this.apiKeys.cohere;
+    console.log(`🔍 Testing Cohere: ${hasCohere ? '✅ Available' : '❌ No API key'}`);
+    return hasCohere;
+  }
+
+  private async testGigaChat(): Promise<boolean> {
+    console.log('🔍 Testing GigaChat availability...');
+    
+    // Проверяем наличие credentials
+    const hasCredentials = this.apiKeys.gigachat.clientId && this.apiKeys.gigachat.clientSecret;
+    if (!hasCredentials) {
+      console.log('❌ GigaChat: No credentials found');
+      console.log('   Client ID:', this.apiKeys.gigachat.clientId ? '✅ Present' : '❌ Missing');
+      console.log('   Client Secret:', this.apiKeys.gigachat.clientSecret ? '✅ Present' : '❌ Missing');
+      return false;
+    }
+    
+    if (!this.gigaChatService) {
+      console.log('❌ GigaChat service not initialized');
+      return false;
+    }
+
+    try {
+      console.log('🔐 Testing GigaChat connection...');
+      const isAvailable = await this.gigaChatService.testConnection();
+      console.log(`✅ GigaChat test: ${isAvailable ? 'SUCCESS' : 'FAILED'}`);
+      return isAvailable;
+    } catch (error) {
+      console.error('❌ GigaChat test failed:', error);
       return false;
     }
   }
@@ -224,104 +267,53 @@ export class AIService {
   }
 
   async generateOutfit(request: OutfitRequest): Promise<GeneratedOutfit> {
+    console.log(`🎨 Generating outfit with ${this.currentProvider}...`);
+    
+    // Проверяем, что request существует
+    if (!request) {
+      console.error('❌ Request is undefined or null in generateOutfit');
+      throw new Error('Request object is required for outfit generation');
+    }
+    
     const startTime = Date.now();
     
     try {
-      // Сначала проверяем, не превышен ли лимит Gemini
-      if (this.currentProvider === 'gemini') {
-        console.log('🔍 Checking Gemini API status before generation...');
-        try {
-          // Быстрая проверка доступности Gemini
-          const testUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash?key=${this.apiKeys.gemini}`;
-          const testResponse = await fetch(testUrl, { 
-            method: 'GET',
-            signal: AbortSignal.timeout(5000)
-          });
-          
-          if (testResponse.status === 429) {
-            console.log('⏰ Gemini API quota exceeded (429), switching to simulation mode immediately');
-            this.currentProvider = 'simulation';
-            return this.simulateResponse(request);
-          } else if (testResponse.status === 503) {
-            console.log('🔄 Gemini API temporarily unavailable (503), switching to simulation mode');
-            this.currentProvider = 'simulation';
-            return this.simulateResponse(request);
-          }
-        } catch (testError) {
-          console.log('⚠️ Gemini API test failed, proceeding with generation attempt...');
-        }
-      }
-      
       let result: GeneratedOutfit;
       
-      switch (this.currentProvider) {
-        case 'openai':
-          result = await this.generateWithOpenAI(request);
-          break;
-        case 'gemini':
-          result = await this.generateWithGemini(request);
-          break;
-        case 'claude':
-          result = await this.generateWithClaude(request);
-          break;
-        case 'cohere':
-          result = await this.generateWithCohere(request);
-          break;
-        case 'local':
-          result = await this.generateWithLocal(request);
-          break;
-        default:
-          result = this.simulateResponse(request);
+      // Используем только GigaChat по требованию пользователя
+      if (this.currentProvider === 'gigachat') {
+        result = await this.generateWithGigaChat(request);
+      } else {
+        // Fallback на симуляцию
+        result = this.simulateResponse(request);
       }
-
+      
       // Записываем время ответа
       const responseTime = Date.now() - startTime;
       if (!this.responseTimes[this.currentProvider]) {
         this.responseTimes[this.currentProvider] = [];
       }
-      this.responseTimes[this.currentProvider].push(responseTime);
-
+      this.responseTimes[this.currentProvider]!.push(responseTime);
+      
+      console.log(`✅ Outfit generated in ${responseTime}ms using ${this.currentProvider}`);
       return result;
+      
     } catch (error) {
-      console.error(`❌ Error with ${this.currentProvider}:`, error);
+      console.error(`❌ Failed to generate outfit with ${this.currentProvider}:`, error);
       
-      // Улучшенная обработка ошибок
-      const errorMessage = error.message || error.toString();
-      
-      if (errorMessage.includes('location is not supported')) {
-        console.log('🌍 Switching to simulation mode due to regional restrictions');
+      // При ошибке GigaChat сразу переключаемся на симуляцию
+      if (this.currentProvider === 'gigachat') {
+        console.log('🔄 GigaChat failed, switching to simulation mode...');
         this.currentProvider = 'simulation';
-      } else if (errorMessage.includes('401')) {
-        console.log('🔑 API key issue detected, switching to simulation mode');
-        this.currentProvider = 'simulation';
-      } else if (errorMessage.includes('400')) {
-        console.log('⚠️ Bad request detected, switching to simulation mode');
-        this.currentProvider = 'simulation';
-      } else if (errorMessage.includes('503')) {
-        console.log('🔄 Service unavailable (503), switching to simulation mode');
-        this.currentProvider = 'simulation';
-      } else if (errorMessage.includes('429')) {
-        console.log('⏰ Rate limit exceeded (429), switching to simulation mode');
-        this.currentProvider = 'simulation';
-      } else if (errorMessage.includes('quota')) {
-        console.log('💳 API quota exceeded, switching to simulation mode');
-        this.currentProvider = 'simulation';
-      } else if (errorMessage.includes('timeout')) {
-        console.log('⏱️ Request timeout, switching to simulation mode');
-        this.currentProvider = 'simulation';
-      } else {
-        console.log('❓ Unknown error, switching to simulation mode');
-        this.currentProvider = 'simulation';
+        return this.simulateResponse(request);
       }
       
-      // Fallback к симуляции
-      console.log('🎭 Using simulation mode for outfit generation');
-      return this.simulateResponse(request);
+      throw error;
     }
   }
 
   private async generateWithOpenAI(request: OutfitRequest): Promise<GeneratedOutfit> {
-    const response = await fetch('/api/openai/v1/chat/completions', {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.apiKeys.openai}`,
@@ -572,6 +564,32 @@ export class AIService {
 
     const data = await response.json();
     return this.parseResponse(data.generations[0]?.text, request);
+  }
+
+  private async generateWithGigaChat(request: OutfitRequest): Promise<GeneratedOutfit> {
+    if (!this.gigaChatService) {
+      throw new Error('GigaChat service not available');
+    }
+
+    console.log('🤖 Generating outfit with GigaChat...');
+    
+    const prompt = this.createPrompt(request);
+    
+    try {
+      const response = await this.gigaChatService.generateText(prompt, {
+        model: 'GigaChat:latest',
+        temperature: 0.7,
+        maxTokens: 1500
+      });
+      
+      console.log('✅ GigaChat response received:', response.substring(0, 100) + '...');
+      
+      return this.parseResponse(response, request);
+      
+    } catch (error) {
+      console.error('❌ GigaChat generation failed:', error);
+      throw error;
+    }
   }
 
   private async generateWithLocal(request: OutfitRequest): Promise<GeneratedOutfit> {
@@ -1018,6 +1036,18 @@ ${isMale ? `
 
   simulateResponse(request: OutfitRequest): GeneratedOutfit {
     console.log('🎭 Generating enhanced simulation outfit based on user data...');
+    
+    // Проверяем, что request существует и имеет необходимые поля
+    if (!request) {
+      console.error('❌ Request is undefined or null in simulateResponse');
+      throw new Error('Request object is required for simulation');
+    }
+    
+    if (!request.measurements || !request.measurements.gender) {
+      console.error('❌ Request measurements or gender is missing');
+      throw new Error('Request measurements and gender are required for simulation');
+    }
+    
     console.log('📊 User data:', {
       bodyType: request.bodyType,
       gender: request.measurements.gender,

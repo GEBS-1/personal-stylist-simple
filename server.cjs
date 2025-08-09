@@ -1,6 +1,31 @@
 const express = require('express');
 const cors = require('cors');
 const fetch = require('node-fetch');
+const https = require('https');
+const crypto = require('crypto');
+require('dotenv').config();
+
+// Function to generate UUID v4
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+// Debug environment variables
+console.log('🔍 Environment variables check:');
+console.log('   VITE_GIGACHAT_CLIENT_ID:', process.env.VITE_GIGACHAT_CLIENT_ID ? '✅ Present' : '❌ Missing');
+console.log('   VITE_GIGACHAT_CLIENT_SECRET:', process.env.VITE_GIGACHAT_CLIENT_SECRET ? '✅ Present' : '❌ Missing');
+console.log('   VITE_GIGACHAT_ACCESS_TOKEN:', process.env.VITE_GIGACHAT_ACCESS_TOKEN ? '✅ Present' : '❌ Missing');
+console.log('   Current working directory:', process.cwd());
+console.log('   .env file exists:', require('fs').existsSync('.env'));
+
+// Create a custom HTTPS agent that ignores SSL certificate errors
+const httpsAgent = new https.Agent({
+  rejectUnauthorized: false
+});
 
 const app = express();
 const PORT = 3001;
@@ -8,6 +33,217 @@ const PORT = 3001;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// GigaChat Proxy Endpoints
+let gigachatAccessToken = null;
+let tokenExpiry = 0;
+
+// Function to get GigaChat access token
+async function getGigaChatToken() {
+  const now = Date.now();
+  
+  // Check if we have a valid token
+  if (gigachatAccessToken && now < tokenExpiry) {
+    return gigachatAccessToken;
+  }
+  
+  try {
+    console.log('🔐 Getting GigaChat access token...');
+    
+    // Check for direct access token first
+    const directToken = process.env.VITE_GIGACHAT_ACCESS_TOKEN;
+    if (directToken) {
+      console.log('✅ Using direct access token from environment');
+      return directToken;
+    }
+    
+    const clientId = process.env.VITE_GIGACHAT_CLIENT_ID;
+    const clientSecret = process.env.VITE_GIGACHAT_CLIENT_SECRET;
+    
+    console.log('🔑 GigaChat credentials check:');
+    console.log(`   Client ID: ${clientId ? '✅ Present' : '❌ Missing'}`);
+    console.log(`   Client Secret: ${clientSecret ? '✅ Present' : '❌ Missing'}`);
+    
+    if (!clientId || !clientSecret) {
+      throw new Error('GigaChat credentials not found in environment variables');
+    }
+    
+    // Create Basic Auth header
+    const authKey = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+    
+         const response = await fetch('https://ngw.devices.sberbank.ru:9443/api/v2/oauth', {
+       method: 'POST',
+       headers: {
+         'Content-Type': 'application/x-www-form-urlencoded',
+         'Accept': 'application/json',
+         'RqUID': generateUUID(),
+         'Authorization': `Basic ${authKey}`,
+         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+       },
+       body: 'scope=GIGACHAT_API_PERS',
+       timeout: 10000,
+       agent: httpsAgent
+     });
+    
+    if (!response.ok) {
+      let errorText = '';
+      try {
+        errorText = await response.text();
+      } catch (e) {
+        errorText = 'Failed to read error response';
+      }
+      console.error(`❌ GigaChat auth failed: ${response.status} - ${errorText}`);
+      console.error(`❌ Response headers:`, response.headers.raw());
+      
+      // Return a mock token for now to allow the system to continue
+      console.log('⚠️ Using mock token due to authentication failure');
+      this.accessToken = 'mock_token_for_fallback';
+      this.tokenExpiry = now + (3600 * 1000); // 1 hour
+      return this.accessToken;
+    }
+    
+    const data = await response.json();
+    gigachatAccessToken = data.access_token;
+    tokenExpiry = now + (data.expires_in * 1000) - 60000; // Subtract 1 minute for safety
+    
+    console.log('✅ GigaChat token obtained successfully');
+    return gigachatAccessToken;
+    
+  } catch (error) {
+    console.error('❌ Failed to get GigaChat token:', error);
+    throw error;
+  }
+}
+
+// GigaChat models endpoint
+app.get('/api/gigachat/models', async (req, res) => {
+  try {
+    const token = await getGigaChatToken();
+    
+    // If we have a mock token, return empty models
+    if (token === 'mock_token_for_fallback') {
+      console.log('⚠️ Returning empty models due to authentication failure');
+      return res.json({ data: [] });
+    }
+    
+    const response = await fetch('https://gigachat.devices.sberbank.ru/api/v1/models', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      timeout: 10000,
+      agent: httpsAgent
+    });
+    
+    if (!response.ok) {
+      throw new Error(`GigaChat models API error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    res.json(data);
+    
+  } catch (error) {
+    console.error('❌ GigaChat models error:', error);
+    // Return empty models instead of 500 error
+    res.json({ data: [] });
+  }
+});
+
+// GigaChat chat completion endpoint
+app.post('/api/gigachat/chat', async (req, res) => {
+  try {
+    const { messages, model = 'GigaChat-Pro', temperature = 0.7, max_tokens = 1000 } = req.body;
+    
+    if (!messages || !Array.isArray(messages)) {
+      return res.status(400).json({ error: 'Messages array is required' });
+    }
+    
+    const token = await getGigaChatToken();
+    
+    const response = await fetch('https://gigachat.devices.sberbank.ru/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: messages,
+        temperature: temperature,
+        max_tokens: max_tokens
+      }),
+      timeout: 30000,
+      agent: httpsAgent
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`GigaChat chat API error: ${response.status} - ${errorText}`);
+    }
+    
+    const data = await response.json();
+    res.json(data);
+    
+  } catch (error) {
+    console.error('❌ GigaChat chat error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GigaChat test connection endpoint
+app.get('/api/gigachat/test', async (req, res) => {
+  try {
+    console.log('🔍 Testing GigaChat connection...');
+    
+    // Test token
+    const token = await getGigaChatToken();
+    if (!token) {
+      return res.json({ success: false, error: 'Failed to get access token' });
+    }
+    
+    // If we got a mock token, return a fallback response
+    if (token === 'mock_token_for_fallback') {
+      console.log('⚠️ GigaChat authentication failed, returning fallback response');
+      return res.json({
+        success: false,
+        error: 'GigaChat authentication failed - using fallback mode',
+        fallback: true
+      });
+    }
+    
+    // Test models
+    const modelsResponse = await fetch('https://gigachat.devices.sberbank.ru/api/v1/models', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      timeout: 10000,
+      agent: httpsAgent
+    });
+    
+    if (!modelsResponse.ok) {
+      return res.json({ success: false, error: `Models API error: ${modelsResponse.status}` });
+    }
+    
+    const modelsData = await modelsResponse.json();
+    const availableModels = modelsData.data || [];
+    
+    console.log(`✅ GigaChat connection test: ${availableModels.length > 0 ? 'SUCCESS' : 'NO MODELS'}`);
+    console.log(`📊 Available models: ${availableModels.length}`);
+    
+    res.json({
+      success: true,
+      models: availableModels,
+      modelCount: availableModels.length
+    });
+    
+  } catch (error) {
+    console.error('❌ GigaChat test failed:', error);
+    res.json({ success: false, error: error.message });
+  }
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -295,9 +531,14 @@ app.get('/api/wildberries/image/:productId', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Wildberries proxy server running on http://localhost:${PORT}`);
+  console.log(`🚀 Proxy server running on http://localhost:${PORT}`);
   console.log(`📡 Available endpoints:`);
-  console.log(`   GET /api/wildberries/search?query=...`);
-  console.log(`   GET /api/wildberries/catalog?category=...`);
-  console.log(`   GET /api/health`);
+  console.log(`   GigaChat:`);
+  console.log(`     GET /api/gigachat/test`);
+  console.log(`     GET /api/gigachat/models`);
+  console.log(`     POST /api/gigachat/chat`);
+  console.log(`   Wildberries:`);
+  console.log(`     GET /api/wildberries/search?query=...`);
+  console.log(`     GET /api/wildberries/catalog?category=...`);
+  console.log(`     GET /api/health`);
 }); 
