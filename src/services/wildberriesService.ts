@@ -145,8 +145,10 @@ class WildberriesService {
       console.log(`📦 Proxy response data:`, data);
       
       if (data.success && data.products && data.products.length > 0) {
-        console.log(`✅ Found ${data.products.length} products via proxy`);
-        return data.products;
+        // Ограничиваем количество товаров согласно параметру limit
+        const limitedProducts = data.products.slice(0, params.limit || 5);
+        console.log(`✅ Found ${limitedProducts.length} products via proxy (limited to ${params.limit || 5})`);
+        return limitedProducts;
       }
       
     } catch (error) {
@@ -203,23 +205,17 @@ class WildberriesService {
       if (response.ok) {
         const data = await response.json();
         if (data.data?.products && data.data.products.length > 0) {
-          console.log(`✅ Found ${data.data.products.length} products via direct API`);
-          return this.parseProducts(data.data.products, params);
+          // Ограничиваем количество товаров согласно параметру limit
+          const limitedProducts = data.data.products.slice(0, params.limit || 5);
+          console.log(`✅ Found ${limitedProducts.length} products via direct API (limited to ${params.limit || 5})`);
+          return this.parseProducts(limitedProducts, params);
         }
       }
     } catch (error) {
-      console.warn('❌ Main API search completely failed:', error);
-      
-      // Обрабатываем сетевые ошибки
-      const errorMessage = error.message || error.toString();
-      if (errorMessage.includes('CORS') || errorMessage.includes('blocked')) {
-        console.log('🚫 CORS blocked - expected for direct API calls');
-      }
+      console.log(`❌ Direct API failed:`, error);
     }
     
-    // Финальный fallback к симуляции
-    console.log('🎭 All real API attempts failed, using simulated products');
-    return this.searchByKeywords(params);
+    return [];
   }
 
   private async searchWithWebScraping(params: SearchParams): Promise<Product[]> {
@@ -1312,16 +1308,18 @@ class WildberriesService {
           const searchQuery = this.buildSpecificSearchQuery(item, params);
           console.log(`📝 Search query: "${searchQuery}"`);
           
-          // Ищем реальные товары
+          // Ищем реальные товары - ТОЛЬКО ОДИН товар на элемент образа
           const realProducts = await this.searchProducts({
             ...params,
             query: searchQuery,
-            limit: 2
+            limit: 1 // Изменено с 2 на 1 - ищем только один товар на элемент
           });
           
           if (realProducts && realProducts.length > 0) {
-            console.log(`✅ Found ${realProducts.length} real products for "${item.name}"`);
-            allProducts.push(...realProducts);
+            // Берем только первый (лучший) товар для этого элемента образа
+            const bestProduct = realProducts[0];
+            console.log(`✅ Found best product for "${item.name}": ${bestProduct.name} - ${bestProduct.price}₽`);
+            allProducts.push(bestProduct);
           } else {
             console.log(`⚠️ No real products found for "${item.name}", creating simulated product`);
             // Если реальных товаров нет, создаем симулированный
@@ -1352,15 +1350,19 @@ class WildberriesService {
           const products = await this.searchProducts({
             ...params,
             query: category,
-            limit: 2
+            limit: 1 // Изменено с 2 на 1
           });
           console.log(`✅ Found ${products.length} products for ${category}`);
-          allProducts.push(...products);
+          if (products.length > 0) {
+            allProducts.push(products[0]); // Берем только первый товар
+          }
         } catch (error) {
           console.log(`⚠️ Failed to search for ${category}:`, error);
           // Добавляем fallback продукты для этой категории
           const fallbackProducts = this.getFallbackProductsForCategory(category, params);
-          allProducts.push(...fallbackProducts);
+          if (fallbackProducts.length > 0) {
+            allProducts.push(fallbackProducts[0]); // Берем только первый fallback товар
+          }
         }
       }
     }
@@ -1369,7 +1371,7 @@ class WildberriesService {
     if (allProducts.length < 3) {
       console.log('📋 Adding additional fallback products');
       const fallbackProducts = this.getFallbackProducts(params);
-      allProducts.push(...fallbackProducts);
+      allProducts.push(...fallbackProducts.slice(0, 3 - allProducts.length));
     }
     
     console.log(`📦 Total products found: ${allProducts.length}`);
@@ -1382,7 +1384,8 @@ class WildberriesService {
     const uniqueProducts = this.removeDuplicates(filteredProducts);
     console.log(`🎯 Final unique products: ${uniqueProducts.length}`);
     
-    const result = uniqueProducts.slice(0, 9);
+    // Возвращаем все найденные товары (не ограничиваем до 9)
+    const result = uniqueProducts;
     
     // Определяем тип результатов для логирования
     const realCount = result.filter(p => !p.id.includes('outfit_') && !p.id.includes('fallback')).length;

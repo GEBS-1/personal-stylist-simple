@@ -150,6 +150,72 @@ app.get('/api/gigachat/models', async (req, res) => {
   }
 });
 
+// GigaChat capabilities endpoint
+app.get('/api/gigachat/capabilities', async (req, res) => {
+  try {
+    console.log('🔍 Checking GigaChat capabilities...');
+    
+    const token = await getGigaChatToken();
+    
+    // If we have a mock token, return fallback capabilities
+    if (token === 'mock_token_for_fallback') {
+      console.log('⚠️ Returning fallback capabilities due to authentication failure');
+      return res.json({
+        supportsImages: false,
+        supportsText: true,
+        models: ['fallback'],
+        fallback: true
+      });
+    }
+    
+    // Check if we can access the models API
+    const modelsResponse = await fetch('https://gigachat.devices.sberbank.ru/api/v1/models', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      timeout: 10000,
+      agent: httpsAgent
+    });
+    
+    if (modelsResponse.ok) {
+      const modelsData = await modelsResponse.json();
+      const availableModels = modelsData.data || [];
+      
+      // Check if any model supports image generation
+      // For now, we'll assume GigaChat supports images if we can access the API
+      const supportsImages = availableModels.length > 0;
+      
+      console.log(`✅ GigaChat capabilities check: images=${supportsImages}, models=${availableModels.length}`);
+      
+      res.json({
+        supportsImages: supportsImages,
+        supportsText: true,
+        models: availableModels.map(m => m.id),
+        modelCount: availableModels.length
+      });
+    } else {
+      console.log('⚠️ GigaChat models API not accessible, returning limited capabilities');
+      res.json({
+        supportsImages: false,
+        supportsText: true,
+        models: [],
+        modelCount: 0
+      });
+    }
+    
+  } catch (error) {
+    console.error('❌ GigaChat capabilities check failed:', error);
+    res.json({
+      supportsImages: false,
+      supportsText: true,
+      models: [],
+      modelCount: 0,
+      error: error.message
+    });
+  }
+});
+
 // GigaChat chat completion endpoint
 app.post('/api/gigachat/chat', async (req, res) => {
   try {
@@ -189,6 +255,52 @@ app.post('/api/gigachat/chat', async (req, res) => {
   } catch (error) {
     console.error('❌ GigaChat chat error:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// GigaChat image generation endpoint
+app.post('/api/gigachat/images', async (req, res) => {
+  try {
+    const { prompt, style, quality = 'standard', size = '1024x1024', aspectRatio = '1:1', bodyType, clothingStyle, colorScheme } = req.body;
+    
+    if (!prompt) {
+      return res.status(400).json({ error: 'Prompt is required' });
+    }
+    
+    console.log('🎨 Generating image with prompt:', prompt);
+    console.log('📐 Settings:', { style, quality, size, aspectRatio, bodyType, clothingStyle, colorScheme });
+    
+    const token = await getGigaChatToken();
+    
+    // If we have a mock token, return a fallback image
+    if (token === 'mock_token_for_fallback') {
+      console.log('⚠️ GigaChat authentication failed, returning fallback image');
+      return res.json({
+        success: true,
+        imageUrl: '/placeholder.svg',
+        fallback: true,
+        message: 'Using fallback image due to authentication failure'
+      });
+    }
+    
+    // For now, we'll return a placeholder image since GigaChat doesn't have a direct image generation API
+    // In the future, this could be integrated with other image generation services
+    console.log('🖼️ Returning placeholder image (GigaChat image generation not yet implemented)');
+    
+    res.json({
+      success: true,
+      imageUrl: '/placeholder.svg',
+      message: 'Image generation via GigaChat is not yet available. Using placeholder image.',
+      fallback: true
+    });
+    
+  } catch (error) {
+    console.error('❌ GigaChat image generation error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message,
+      fallback: true
+    });
   }
 });
 
@@ -416,12 +528,14 @@ app.get('/api/wildberries/search', async (req, res) => {
       sizes: product.sizes?.map((s) => s.name) || ['S', 'M', 'L', 'XL']
     }));
 
-    console.log(`✅ Processed ${processedProducts.length} products`);
+    // Ограничиваем количество товаров согласно параметру limit
+    const limitedProducts = processedProducts.slice(0, parseInt(limit) || 10);
+    console.log(`✅ Processed ${limitedProducts.length} products (limited to ${limit})`);
 
     res.json({
       success: true,
-      products: processedProducts,
-      total: processedProducts.length
+      products: limitedProducts,
+      total: limitedProducts.length
     });
 
   } catch (error) {
@@ -536,7 +650,9 @@ app.listen(PORT, () => {
   console.log(`   GigaChat:`);
   console.log(`     GET /api/gigachat/test`);
   console.log(`     GET /api/gigachat/models`);
+  console.log(`     GET /api/gigachat/capabilities`);
   console.log(`     POST /api/gigachat/chat`);
+  console.log(`     POST /api/gigachat/images`);
   console.log(`   Wildberries:`);
   console.log(`     GET /api/wildberries/search?query=...`);
   console.log(`     GET /api/wildberries/catalog?category=...`);

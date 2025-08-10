@@ -5,13 +5,15 @@ export const env = {
   OPENAI_API_KEY: import.meta.env.VITE_OPENAI_API_KEY || '',
   CLAUDE_API_KEY: import.meta.env.VITE_CLAUDE_API_KEY || '',
   COHERE_API_KEY: import.meta.env.VITE_COHERE_API_KEY || '',
+  GIGACHAT_CLIENT_ID: import.meta.env.VITE_GIGACHAT_CLIENT_ID || '',
+  GIGACHAT_CLIENT_SECRET: import.meta.env.VITE_GIGACHAT_CLIENT_SECRET || '',
   
   // Marketplace API Keys
   WILDBERRIES_API_KEY: import.meta.env.VITE_WILDBERRIES_API_KEY || '',
   
   // App Settings
-  APP_NAME: import.meta.env.VITE_APP_NAME || 'Personal Stylist Simple',
-  APP_VERSION: import.meta.env.VITE_APP_VERSION || '1.0.0',
+  APP_NAME: import.meta.env.VITE_APP_NAME || 'Personal Stylist Pro',
+  APP_VERSION: import.meta.env.VITE_APP_VERSION || '2.0.0',
   API_URL: import.meta.env.VITE_API_URL || 'http://localhost:8081',
   
   // Marketplace Settings
@@ -23,6 +25,9 @@ export const env = {
   NODE_ENV: import.meta.env.NODE_ENV || 'development',
   DEV: import.meta.env.DEV || false,
 } as const;
+
+// Константы для изображений
+export const PLACEHOLDER_IMAGE = '/placeholder.svg';
 
 // Проверка валидности API ключей
 export const isValidApiKey = (key: string): boolean => {
@@ -67,6 +72,26 @@ export function hasValidAiKey() {
   );
 }
 
+// Проверка поддержки генерации изображений
+export function supportsImageGeneration() {
+  const keys = getValidApiKeys();
+  const hasKeys = !!(keys.gigachat.clientId && keys.gigachat.clientSecret);
+  
+  // Дополнительная проверка на placeholder значения
+  const hasValidKeys = hasKeys && 
+    !keys.gigachat.clientId.includes('your_') && 
+    !keys.gigachat.clientSecret.includes('your_');
+  
+  console.log('🔍 Image Generation Check:', {
+    hasKeys,
+    hasValidKeys,
+    clientId: keys.gigachat.clientId ? '✅ Present' : '❌ Missing',
+    clientSecret: keys.gigachat.clientSecret ? '✅ Present' : '❌ Missing'
+  });
+  
+  return hasValidKeys;
+}
+
 // Логирование конфигурации (только в development)
 export const logConfig = () => {
   if (env.DEV) {
@@ -82,6 +107,9 @@ export const logConfig = () => {
     console.log(`  Claude: ${keys.claude ? '✅ Valid' : '❌ Missing/Invalid'}`);
     console.log(`  Cohere: ${keys.cohere ? '✅ Valid' : '❌ Missing/Invalid'}`);
     console.log(`  GigaChat: ${keys.gigachat.clientId && keys.gigachat.clientSecret ? '✅ Valid' : '❌ Missing/Invalid'}`);
+    
+    console.log('🎨 Image Generation Support:');
+    console.log(`  GigaChat Images: ${supportsImageGeneration() ? '✅ Available' : '❌ Not Available'}`);
     
     console.log('🛍️ Marketplace Settings:');
     console.log(`  Ozon: ${env.ENABLE_OZON ? '✅ Enabled' : '❌ Disabled'}`);

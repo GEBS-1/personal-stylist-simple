@@ -38,6 +38,30 @@ export interface GigaChatResponse {
   };
 }
 
+// Новые интерфейсы для генерации изображений
+export interface ImageGenerationRequest {
+  prompt: string;
+  style?: string;
+  quality?: 'standard' | 'high';
+  size?: '1024x1024' | '1792x1024' | '1024x1792';
+  aspectRatio?: '1:1' | '16:9' | '9:16';
+  bodyType?: string;
+  clothingStyle?: string;
+  colorScheme?: string;
+}
+
+export interface ImageGenerationResponse {
+  success: boolean;
+  imageUrl?: string;
+  imageData?: string; // base64
+  error?: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+}
+
 export class GigaChatService {
   private config: GigaChatConfig;
   private accessToken: string | null = null;
@@ -193,6 +217,108 @@ export class GigaChatService {
     return response.choices[0]?.message?.content || '';
   }
 
+  // Новый метод для генерации изображений
+  async generateImage(request: ImageGenerationRequest): Promise<ImageGenerationResponse> {
+    try {
+      console.log('🎨 Generating image with GigaChat:', request);
+
+      // Формируем детальный промпт для генерации изображения
+      const detailedPrompt = this.buildImagePrompt(request);
+      
+      // Создаем сообщение для генерации изображения
+      const messages: GigaChatMessage[] = [
+        {
+          role: 'system',
+          content: 'Ты - эксперт по генерации изображений модной одежды. Создавай реалистичные, высококачественные изображения людей в стильной одежде.'
+        },
+        {
+          role: 'user',
+          content: `Создай изображение: ${detailedPrompt}`
+        }
+      ];
+
+      // Отправляем запрос на генерацию изображения
+      const response = await fetch(`${this.proxyUrl}/images`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          prompt: detailedPrompt,
+          style: request.style || 'realistic',
+          quality: request.quality || 'high',
+          size: request.size || '1024x1024',
+          aspectRatio: request.aspectRatio || '1:1',
+          bodyType: request.bodyType,
+          clothingStyle: request.clothingStyle,
+          colorScheme: request.colorScheme
+        }),
+        timeout: 60000 // Увеличиваем таймаут для генерации изображений
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Image generation failed: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.imageUrl) {
+        console.log('✅ Image generated successfully');
+        return {
+          success: true,
+          imageUrl: data.imageUrl,
+          imageData: data.imageData,
+          usage: data.usage
+        };
+      } else {
+        throw new Error(data.error || 'Image generation failed');
+      }
+
+    } catch (error) {
+      console.error('❌ Image generation failed:', error);
+      
+      // Возвращаем fallback изображение в случае ошибки
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        imageUrl: this.getFallbackImageUrl(request)
+      };
+    }
+  }
+
+  // Построение детального промпта для генерации изображения
+  private buildImagePrompt(request: ImageGenerationRequest): string {
+    const { prompt, bodyType, clothingStyle, colorScheme } = request;
+    
+    let detailedPrompt = prompt;
+    
+    if (bodyType) {
+      detailedPrompt += ` Человек с типом фигуры: ${bodyType}.`;
+    }
+    
+    if (clothingStyle) {
+      detailedPrompt += ` Стиль одежды: ${clothingStyle}.`;
+    }
+    
+    if (colorScheme) {
+      detailedPrompt += ` Цветовая схема: ${colorScheme}.`;
+    }
+    
+    // Добавляем стандартные требования к качеству
+    detailedPrompt += ' Изображение должно быть высокого качества, реалистичным, с хорошим освещением. Одежда должна быть стильной и современной.';
+    
+    return detailedPrompt;
+  }
+
+  // Получение fallback изображения
+  private getFallbackImageUrl(request: ImageGenerationRequest): string {
+    // Возвращаем placeholder изображение
+    // Используем абсолютный путь для лучшей совместимости
+    return '/placeholder.svg';
+  }
+
   // Получение информации о доступных моделях через прокси
   async getModels(): Promise<any[]> {
     try {
@@ -245,6 +371,30 @@ export class GigaChatService {
 
     } catch (error) {
       console.error('❌ GigaChat connection test failed:', error);
+      return false;
+    }
+  }
+
+  // Проверка поддержки генерации изображений
+  async supportsImageGeneration(): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.proxyUrl}/capabilities`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        timeout: 10000
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return data.supportsImages || false;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('❌ Failed to check image generation support:', error);
       return false;
     }
   }

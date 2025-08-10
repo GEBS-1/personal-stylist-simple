@@ -9,13 +9,16 @@ import {
   ChevronRight,
   Calculator,
   Palette,
-  ShoppingBag
+  ShoppingBag,
+  Image as ImageIcon
 } from "lucide-react";
 import { ManualBodyInput, BodyData } from "@/components/fashion/ManualBodyInput";
 import { StylePreferences } from "@/components/fashion/StylePreferences";
 import { OutfitGenerator } from "@/components/fashion/OutfitGenerator";
+import { ImageGenerator } from "@/components/fashion/ImageGenerator";
 import ProductCatalog from "@/components/fashion/ProductCatalog";
 import TestAPI from "@/components/TestAPI";
+import { TestEnv } from "@/components/TestEnv";
 import { logConfig } from "@/config/env";
 
 interface AnalysisData extends BodyData {
@@ -26,10 +29,11 @@ interface AnalysisData extends BodyData {
 const Index = () => {
   console.log('🎯 Index component is rendering...');
   
-  const [activeStep, setActiveStep] = useState<'analysis' | 'preferences' | 'outfits' | 'catalog' | 'test'>('analysis');
+  const [activeStep, setActiveStep] = useState<'analysis' | 'preferences' | 'outfits' | 'images' | 'catalog' | 'test'>('analysis');
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
   const [generatedOutfit, setGeneratedOutfit] = useState<any>(null);
+  const [generatedImage, setGeneratedImage] = useState<any>(null);
 
   useEffect(() => {
     // Логируем конфигурацию при загрузке
@@ -44,12 +48,16 @@ const Index = () => {
     } else if (stepId === 'preferences') {
       setActiveStep('outfits');
     } else if (stepId === 'outfits') {
+      setActiveStep('images');
+    } else if (stepId === 'images') {
       setActiveStep('catalog');
     }
     
-    // Сохраняем сгенерированный образ
+    // Сохраняем сгенерированные данные
     if (stepId === 'outfits' && data) {
       setGeneratedOutfit(data);
+    } else if (stepId === 'images' && data) {
+      setGeneratedImage(data);
     }
   };
 
@@ -57,7 +65,7 @@ const Index = () => {
     setActiveStep('preferences');
   };
 
-  const handleStepChange = (step: 'analysis' | 'preferences' | 'outfits' | 'catalog' | 'test') => {
+  const handleStepChange = (step: 'analysis' | 'preferences' | 'outfits' | 'images' | 'catalog' | 'test') => {
     setActiveStep(step);
   };
 
@@ -94,6 +102,13 @@ const Index = () => {
       completed: completedSteps.has('outfits')
     },
     {
+      id: 'images',
+      title: 'Генерация изображений',
+      description: 'Создание реалистичных образов',
+      icon: ImageIcon,
+      completed: completedSteps.has('images')
+    },
+    {
       id: 'catalog',
       title: 'Каталог товаров',
       description: 'Рекомендуемые товары из маркетплейсов',
@@ -118,7 +133,7 @@ const Index = () => {
             Ваш <span className="text-primary">ИИ-стилист</span>
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
-            Персональный подбор одежды на основе ручного ввода данных о фигуре
+            Персональный подбор одежды с генерацией реалистичных изображений
           </p>
           <div className="flex flex-wrap gap-3 justify-center mb-8">
             <Badge variant="secondary" className="px-4 py-2 text-sm">
@@ -128,6 +143,10 @@ const Index = () => {
             <Badge variant="secondary" className="px-4 py-2 text-sm">
               <Sparkles className="w-4 h-4 mr-2" />
               ИИ-рекомендации
+            </Badge>
+            <Badge variant="secondary" className="px-4 py-2 text-sm">
+              <ImageIcon className="w-4 h-4 mr-2" />
+              Генерация изображений
             </Badge>
             <Badge variant="secondary" className="px-4 py-2 text-sm">
               <ShoppingBag className="w-4 h-4 mr-2" />
@@ -146,7 +165,7 @@ const Index = () => {
           <div className="mt-6 p-4 bg-muted/30 rounded-lg max-w-2xl mx-auto">
             <p className="text-sm text-muted-foreground">
               💡 <strong>Демо-режим:</strong> Приложение работает с тестовыми данными. 
-              Для реальных рекомендаций настройте API ключи в файле .env
+              Для реальных рекомендаций и генерации изображений настройте API ключи в файле .env
             </p>
           </div>
         </div>
@@ -235,6 +254,19 @@ const Index = () => {
               />
             </TabsContent>
 
+            <TabsContent value="images" className="space-y-8">
+              <div className="text-center mb-8">
+                <h2 className="font-display text-3xl font-bold mb-4">Генерация изображений</h2>
+                <p className="text-muted-foreground max-w-2xl mx-auto">
+                  Создайте реалистичные изображения ваших образов с помощью ИИ
+                </p>
+              </div>
+              <ImageGenerator 
+                analysisData={analysisData}
+                onImageGenerated={(image) => handleStepComplete('images', image)} 
+              />
+            </TabsContent>
+
             <TabsContent value="catalog" className="space-y-8">
               <div className="text-center mb-8">
                 <h2 className="font-display text-3xl font-bold mb-4">Каталог товаров</h2>
@@ -253,6 +285,10 @@ const Index = () => {
                 </p>
               </div>
               <TestAPI />
+              
+              <div className="mt-8">
+                <TestEnv />
+              </div>
             </TabsContent>
           </Tabs>
         </div>
