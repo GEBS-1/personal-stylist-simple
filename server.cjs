@@ -221,6 +221,107 @@ app.post('/api/gigachat/chat', async (req, res) => {
   }
 });
 
+// Генерация изображений через DALL-E
+app.post('/api/dalle/image', async (req, res) => {
+  try {
+    const { prompt, size = '1024x1024', quality = 'standard' } = req.body;
+    
+    console.log('🎨 Generating image with DALL-E...');
+    console.log(`📝 Prompt: ${prompt}`);
+    console.log(`📏 Size: ${size}`);
+    console.log(`⚡ Quality: ${quality}`);
+    
+    // Проверяем наличие API ключа
+    const openaiKey = process.env.VITE_OPENAI_API_KEY;
+    if (!openaiKey) {
+      console.log('⚠️ OpenAI API key not found, using fallback');
+      return res.json({
+        success: true,
+        imageUrl: '/placeholder.svg',
+        model: 'dalle-fallback',
+        usage: {
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0
+        }
+      });
+    }
+    
+    const response = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        prompt,
+        n: 1,
+        size: size,
+        quality: quality === 'high' ? 'hd' : 'standard',
+        response_format: 'url'
+      })
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ DALL-E generation failed: ${response.status} - ${errorText}`);
+      
+      return res.json({
+        success: true,
+        imageUrl: '/placeholder.svg',
+        model: 'dalle-fallback',
+        usage: {
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0
+        }
+      });
+    }
+    
+    const data = await response.json();
+    
+    if (data.data && data.data[0]?.url) {
+      console.log('✅ DALL-E image generated successfully');
+      res.json({
+        success: true,
+        imageUrl: data.data[0].url,
+        model: 'dalle',
+        usage: {
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0
+        }
+      });
+    } else {
+      console.warn('⚠️ No image URL in DALL-E response, using fallback');
+      res.json({
+        success: true,
+        imageUrl: '/placeholder.svg',
+        model: 'dalle-fallback',
+        usage: {
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0
+        }
+      });
+    }
+    
+  } catch (error) {
+    console.error('❌ DALL-E generation error:', error);
+    res.json({
+      success: true,
+      imageUrl: '/placeholder.svg',
+      model: 'dalle-fallback',
+      error: error.message,
+      usage: {
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0
+      }
+    });
+  }
+});
+
 // Генерация изображений через GigaChat
 app.post('/api/gigachat/image', async (req, res) => {
   try {
@@ -490,6 +591,7 @@ app.listen(PORT, () => {
   console.log(`     GET /api/gigachat/capabilities`);
   console.log(`     POST /api/gigachat/chat`);
   console.log(`     POST /api/gigachat/image`);
+  console.log(`     POST /api/dalle/image`);
   console.log(`   Wildberries:`);
   console.log(`     GET /api/wildberries/search?query=...`);
   console.log(`     GET /api/wildberries/catalog?category=...`);

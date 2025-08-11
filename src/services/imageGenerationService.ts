@@ -140,18 +140,15 @@ export class ImageGenerationService {
     try {
       const prompt = this.buildDallePrompt(request);
       
-      const response = await fetch('https://api.openai.com/v1/images/generations', {
+      const response = await fetch('http://localhost:3001/api/dalle/image', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           prompt,
-          n: 1,
           size: request.size || '1024x1024',
-          quality: request.quality === 'high' ? 'hd' : 'standard',
-          response_format: 'url'
+          quality: request.quality || 'standard'
         })
       });
 
@@ -161,19 +158,15 @@ export class ImageGenerationService {
 
       const data = await response.json();
       
-      if (data.data && data.data[0]?.url) {
+      if (data.success && data.imageUrl) {
         return {
           success: true,
-          imageUrl: data.data[0].url,
-          model: 'dalle',
-          usage: {
-            promptTokens: 0,
-            completionTokens: 0,
-            totalTokens: 0
-          }
+          imageUrl: data.imageUrl,
+          model: data.model || 'dalle',
+          usage: data.usage
         };
       } else {
-        throw new Error('No image URL in response');
+        throw new Error(data.error || 'Unknown error');
       }
     } catch (error) {
       console.error('❌ DALL-E generation failed:', error);
