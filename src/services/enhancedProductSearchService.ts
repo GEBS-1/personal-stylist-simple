@@ -340,6 +340,7 @@ export class EnhancedProductSearchService {
   }
 
   private getFallbackProducts(item: OutfitItem, outfit: ApprovedOutfit): ProductSearchResult[] {
+    // Создаем более реалистичные fallback товары с реальными ссылками
     const fallbackProducts = [
       {
         id: `fallback_${item.category}_1`,
@@ -350,7 +351,7 @@ export class EnhancedProductSearchService {
         rating: 4.0 + Math.random() * 0.5,
         reviews: Math.floor(Math.random() * 500) + 50,
         image: '/placeholder.svg',
-        url: 'https://www.wildberries.ru/',
+        url: this.buildWildberriesSearchUrl(item, outfit),
         marketplace: 'wildberries',
         category: item.category,
         colors: item.colors,
@@ -367,17 +368,40 @@ export class EnhancedProductSearchService {
         rating: 4.2 + Math.random() * 0.3,
         reviews: Math.floor(Math.random() * 300) + 30,
         image: '/placeholder.svg',
-        url: 'https://www.wildberries.ru/',
+        url: this.buildWildberriesSearchUrl(item, outfit),
         marketplace: 'wildberries',
         category: item.category,
         colors: item.colors,
         sizes: ['S', 'M', 'L'],
         relevanceScore: 0.7,
         matchReason: 'популярный товар'
+      },
+      {
+        id: `fallback_${item.category}_3`,
+        name: `${item.name} (стильный)`,
+        price: Math.floor(Math.random() * 6000) + 1500,
+        originalPrice: Math.floor(Math.random() * 8000) + 2500,
+        discount: Math.floor(Math.random() * 20) + 5,
+        rating: 4.5 + Math.random() * 0.3,
+        reviews: Math.floor(Math.random() * 200) + 20,
+        image: '/placeholder.svg',
+        url: this.buildWildberriesSearchUrl(item, outfit),
+        marketplace: 'wildberries',
+        category: item.category,
+        colors: item.colors,
+        sizes: ['XS', 'S', 'M', 'L', 'XL'],
+        relevanceScore: 0.75,
+        matchReason: 'стильный товар'
       }
     ];
 
     return fallbackProducts;
+  }
+
+  private buildWildberriesSearchUrl(item: OutfitItem, outfit: ApprovedOutfit): string {
+    // Создаем реальную ссылку на поиск в Wildberries
+    const searchQuery = encodeURIComponent(this.buildEnhancedSearchQuery(item, outfit));
+    return `https://www.wildberries.ru/catalog/0/search.aspx?search=${searchQuery}`;
   }
 }
 

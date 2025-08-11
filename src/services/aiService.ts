@@ -93,9 +93,16 @@ export class AIService {
           return await this.testGigaChat();
         case 'simulation':
           return true; // Симуляция всегда доступна
-        default:
+        case 'gemini':
+        case 'openai':
+        case 'claude':
+        case 'cohere':
+        case 'local':
           // Все остальные провайдеры отключены по требованию пользователя
           console.log(`🚫 ${provider} is disabled - using only GigaChat`);
+          return false;
+        default:
+          console.log(`❌ Unknown provider: ${provider}`);
           return false;
       }
     } catch (error) {
