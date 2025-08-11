@@ -67,6 +67,8 @@ export class GigaChatService {
   private accessToken: string | null = null;
   private tokenExpiry: number = 0;
   private proxyUrl: string = 'http://localhost:3001/api/gigachat';
+  private connectionTestCache: { available: boolean; timestamp: number } | null = null;
+  private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 минут
 
   constructor(config: GigaChatConfig) {
     this.config = {
@@ -84,8 +86,6 @@ export class GigaChatService {
       return this.accessToken;
     }
 
-    console.log('🔐 Getting GigaChat access token via proxy...');
-
     try {
       // Используем прокси для получения токена
       const response = await fetch(`${this.proxyUrl}/test`, {
@@ -94,19 +94,17 @@ export class GigaChatService {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        timeout: 15000
+        timeout: 10000 // Уменьшили таймаут
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`GigaChat proxy test failed: ${response.status} - ${errorText}`);
+        throw new Error(`GigaChat proxy test failed: ${response.status}`);
       }
 
       const data = await response.json();
       
       if (!data.success) {
         if (data.fallback) {
-          console.log('⚠️ GigaChat authentication failed, using fallback mode');
           this.accessToken = 'fallback_token';
           this.tokenExpiry = Date.now() + (3600 * 1000); // 1 час
           return this.accessToken;
@@ -118,12 +116,13 @@ export class GigaChatService {
       this.accessToken = 'proxy_token';
       this.tokenExpiry = Date.now() + (3600 * 1000); // 1 час
 
-      console.log('✅ GigaChat proxy connection successful');
       return this.accessToken;
 
     } catch (error) {
-      console.error('❌ Failed to connect to GigaChat proxy:', error);
-      throw error;
+      // В случае ошибки используем fallback
+      this.accessToken = 'fallback_token';
+      this.tokenExpiry = Date.now() + (3600 * 1000);
+      return this.accessToken;
     }
   }
 
@@ -435,39 +434,30 @@ export class GigaChatService {
 
   // Проверка доступности сервиса
   async testConnection(): Promise<boolean> {
+    // Проверяем кэш
+    if (this.connectionTestCache && Date.now() - this.connectionTestCache.timestamp < this.CACHE_DURATION) {
+      return this.connectionTestCache.available;
+    }
+    
     try {
-      console.log('🔍 Testing GigaChat connection...');
-      
       // Check if we have a fallback token
       if (this.accessToken === 'fallback_token') {
-        console.log('⚠️ GigaChat authentication failed, but returning true for fallback mode');
-        return true; // Возвращаем true для fallback режима
+        this.connectionTestCache = { available: true, timestamp: Date.now() };
+        return true;
       }
       
       const models = await this.getModels();
       const hasModels = models.length > 0;
       
-      console.log(`✅ GigaChat connection test: ${hasModels ? 'SUCCESS' : 'NO MODELS'}`);
-      console.log(`📊 Available models: ${models.length}`);
+      const isAvailable = hasModels || this.accessToken === 'fallback_token';
+      this.connectionTestCache = { available: isAvailable, timestamp: Date.now() };
       
-      if (hasModels) {
-        models.forEach(model => {
-          console.log(`   - ${model.id}: ${model.object}`);
-        });
-      }
-      
-      // Если нет моделей, но есть fallback, возвращаем true
-      if (!hasModels) {
-        console.log('⚠️ No models found, but GigaChat will work in fallback mode');
-        return true;
-      }
-      
-      return hasModels;
+      return isAvailable;
 
     } catch (error) {
-      console.error('❌ GigaChat connection test failed:', error);
-      console.log('⚠️ GigaChat will work in fallback mode');
-      return true; // Возвращаем true для fallback режима
+      // В случае ошибки считаем доступным для fallback
+      this.connectionTestCache = { available: true, timestamp: Date.now() };
+      return true;
     }
   }
 

@@ -52,26 +52,14 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
   useEffect(() => {
     // Автоматически запускаем генерацию при наличии approved outfit
     if (approvedOutfit && !generatedImage && !isGenerating) {
-      console.log('🎨 Auto-generating image for approved outfit:', approvedOutfit.name);
       generateImageFromOutfit();
     }
   }, [approvedOutfit]);
 
   const initializeImageService = async () => {
-    console.log('🔍 Initializing Image Generation Service...');
-    console.log('🔑 Environment check:', {
-      env: {
-        clientId: import.meta.env.VITE_GIGACHAT_CLIENT_ID ? '✅ Present' : '❌ Missing',
-        clientSecret: import.meta.env.VITE_GIGACHAT_CLIENT_SECRET ? '✅ Present' : '❌ Missing'
-      }
-    });
-    
     try {
       const availableProviders = imageGenerationService.getAvailableProviders();
       const currentProvider = imageGenerationService.getCurrentProvider();
-      
-      console.log(`✅ Available providers: ${availableProviders.join(', ')}`);
-      console.log(`🎯 Current provider: ${currentProvider}`);
       
       if (availableProviders.length > 0) {
         setServiceStatus('available');
@@ -79,7 +67,6 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
         setServiceStatus('unavailable');
       }
     } catch (error) {
-      console.error('Failed to initialize Image Service:', error);
       setServiceStatus('error');
     }
   };
@@ -87,8 +74,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
   const generateInitialPrompt = () => {
     if (approvedOutfit) {
       // Используем данные из approved outfit для создания промпта
-      const prompt = generatePromptFromOutfit();
-      console.log('🎯 Initial prompt generated:', prompt);
+      generatePromptFromOutfit();
     } else if (analysisData) {
       // Используем базовые данные анализа
       generatePromptFromAnalysis();
@@ -97,11 +83,8 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
 
   const generatePromptFromOutfit = (): string => {
     if (!approvedOutfit) {
-      console.warn('⚠️ No approved outfit available for prompt generation');
       return '';
     }
-
-    console.log('🔍 Generating prompt from outfit:', approvedOutfit);
     
     const { name, description, items, colorPalette, styleNotes } = approvedOutfit;
     const { gender } = analysisData || {};
@@ -135,8 +118,6 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
     }
     
     prompt += '. Одежда должна быть современной, стильной и хорошо сидеть по фигуре.';
-    
-    console.log('📝 Generated prompt:', prompt);
     
     setCurrentPrompt(prompt);
     setCustomPrompt(prompt);
@@ -183,10 +164,6 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
       // Генерируем промпт на основе approved outfit и получаем его сразу
       const generatedPrompt = generatePromptFromOutfit();
       
-      console.log('🔍 Generated prompt:', generatedPrompt);
-      console.log('🔍 Current customPrompt:', customPrompt);
-      console.log('🔍 Current currentPrompt:', currentPrompt);
-      
       const request: ImageGenerationRequest = {
         prompt: generatedPrompt || customPrompt || currentPrompt,
         style: imageSettings.style,
@@ -194,15 +171,10 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
         size: imageSettings.size,
         aspectRatio: imageSettings.aspectRatio
       };
-
-      console.log('🎨 Auto-generating image for outfit:', approvedOutfit.name);
-      console.log('📝 Final prompt:', request.prompt);
       
       // Проверяем, что промпт не пустой
       if (!request.prompt || request.prompt.trim() === '') {
-        console.warn('⚠️ Empty prompt detected, generating fallback prompt');
         request.prompt = `Стильный человек в образе: ${approvedOutfit.name || 'модный образ'}. ${approvedOutfit.description || ''}`;
-        console.log('📝 Fallback prompt:', request.prompt);
       }
       
       const result = await imageGenerationService.generateImage(request);
@@ -212,10 +184,7 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
         onImageGenerated(result);
       }
       
-      console.log('✅ Auto image generation completed:', result);
-      
     } catch (error) {
-      console.error('❌ Auto image generation failed:', error);
       setGeneratedImage({
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'

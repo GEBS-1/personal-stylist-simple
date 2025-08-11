@@ -43,6 +43,8 @@ export class AIService {
   private responseTimes: Partial<Record<AIProvider, number[]>> = {};
   private gigaChatService: GigaChatService | null = null;
   private initialized = false;
+  private providerTestCache = new Map<AIProvider, { available: boolean, timestamp: number }>();
+  private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 минут
 
   constructor() {
     if (AIService.instance) {
@@ -73,61 +75,55 @@ export class AIService {
 
   private async initializeProvider() {
     if (this.initialized) {
-      console.log('🔧 AI provider already initialized');
       return;
     }
     
-    console.log('🔧 Initializing AI provider...');
+    // Быстрая инициализация - проверяем только GigaChat
+    const isGigaChatAvailable = await this.testProvider('gigachat');
     
-    // Используем только GigaChat по требованию пользователя
-    const providers: AIProvider[] = [
-      'gigachat',    // 🥇 Единственный активный провайдер - GigaChat
-      'simulation'   // 🎭 Fallback - только если GigaChat недоступен
-    ];
-    
-    for (const provider of providers) {
-      console.log(`🧪 Testing ${provider}...`);
-      const isAvailable = await this.testProvider(provider);
-      
-      if (isAvailable) {
-        this.currentProvider = provider;
-        console.log(`✅ Selected ${provider} as AI provider`);
-        this.initialized = true;
-        return;
-      }
-      
-      console.log(`❌ ${provider} is not available`);
+    if (isGigaChatAvailable) {
+      this.currentProvider = 'gigachat';
+    } else {
+      this.currentProvider = 'simulation';
     }
     
-    // Если ничего не работает, используем симуляцию
-    this.currentProvider = 'simulation';
-    console.log('🎭 Using simulation mode as fallback');
     this.initialized = true;
   }
 
   private async testProvider(provider: AIProvider): Promise<boolean> {
-    console.log(`🧪 Testing ${provider} provider...`);
+    // Проверяем кэш
+    const cached = this.providerTestCache.get(provider);
+    if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
+      return cached.available;
+    }
     
     try {
+      let isAvailable = false;
+      
       switch (provider) {
         case 'gigachat':
-          return await this.testGigaChat();
+          isAvailable = await this.testGigaChat();
+          break;
         case 'simulation':
-          return true; // Симуляция всегда доступна
-        case 'gemini':
-        case 'openai':
-        case 'claude':
-        case 'cohere':
-        case 'local':
-          // Все остальные провайдеры отключены по требованию пользователя
-          console.log(`🚫 ${provider} is disabled - using only GigaChat`);
-          return false;
+          isAvailable = true;
+          break;
         default:
-          console.log(`❌ Unknown provider: ${provider}`);
-          return false;
+          isAvailable = false;
       }
+      
+      // Кэшируем результат
+      this.providerTestCache.set(provider, {
+        available: isAvailable,
+        timestamp: Date.now()
+      });
+      
+      return isAvailable;
     } catch (error) {
-      console.error(`❌ ${provider} test failed:`, error);
+      // Кэшируем отрицательный результат
+      this.providerTestCache.set(provider, {
+        available: false,
+        timestamp: Date.now()
+      });
       return false;
     }
   }
