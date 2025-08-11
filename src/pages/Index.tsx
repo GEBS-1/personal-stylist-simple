@@ -287,11 +287,12 @@ const Index = () => {
               <div className="text-center mb-8">
                 <h2 className="font-display text-3xl font-bold mb-4">Генерация изображений</h2>
                 <p className="text-muted-foreground max-w-2xl mx-auto">
-                  Создайте визуальный образ вашего наряда (опциональный шаг)
+                  Создайте визуальный образ вашего наряда (автоматически на основе одобренного образа)
                 </p>
               </div>
               <ImageGenerator 
                 analysisData={analysisData}
+                approvedOutfit={generatedOutfit}
                 onImageGenerated={(image) => handleStepComplete('images', image)} 
               />
             </TabsContent>

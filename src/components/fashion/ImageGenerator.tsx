@@ -23,11 +23,13 @@ import { env } from '@/config/env';
 
 interface ImageGeneratorProps {
   analysisData: any;
+  approvedOutfit?: any; // Добавляем approved outfit
   onImageGenerated?: (image: ImageGenerationResponse) => void;
 }
 
 export const ImageGenerator: React.FC<ImageGeneratorProps> = ({ 
   analysisData, 
+  approvedOutfit,
   onImageGenerated 
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
@@ -45,7 +47,15 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
   useEffect(() => {
     initializeImageService();
     generateInitialPrompt();
-  }, [analysisData]);
+  }, [analysisData, approvedOutfit]);
+
+  useEffect(() => {
+    // Автоматически запускаем генерацию при наличии approved outfit
+    if (approvedOutfit && !generatedImage && !isGenerating) {
+      console.log('🎨 Auto-generating image for approved outfit:', approvedOutfit.name);
+      generateImageFromOutfit();
+    }
+  }, [approvedOutfit]);
 
   const initializeImageService = async () => {
     console.log('🔍 Initializing Image Generation Service...');
@@ -75,6 +85,54 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
   };
 
   const generateInitialPrompt = () => {
+    if (approvedOutfit) {
+      // Используем данные из approved outfit для создания промпта
+      generatePromptFromOutfit();
+    } else if (analysisData) {
+      // Используем базовые данные анализа
+      generatePromptFromAnalysis();
+    }
+  };
+
+  const generatePromptFromOutfit = () => {
+    if (!approvedOutfit) return;
+
+    const { name, description, items, colorPalette, styleNotes } = approvedOutfit;
+    const { gender } = analysisData || {};
+    
+    let prompt = `Стильный человек ${gender === 'female' ? 'женского' : 'мужского'} пола`;
+    
+    // Добавляем описание образа
+    if (description) {
+      prompt += ` в образе: ${description}`;
+    }
+    
+    // Добавляем детали одежды
+    if (items && items.length > 0) {
+      prompt += '. Одежда включает: ';
+      items.forEach((item: any, index: number) => {
+        prompt += `${item.name} ${item.colors ? `в цветах ${item.colors.join(', ')}` : ''}`;
+        if (index < items.length - 1) prompt += ', ';
+      });
+    }
+    
+    // Добавляем цветовую палитру
+    if (colorPalette && colorPalette.length > 0) {
+      prompt += `. Цветовая палитра: ${colorPalette.join(', ')}`;
+    }
+    
+    // Добавляем стилевые заметки
+    if (styleNotes) {
+      prompt += `. ${styleNotes}`;
+    }
+    
+    prompt += '. Одежда должна быть современной, стильной и хорошо сидеть по фигуре.';
+    
+    setCurrentPrompt(prompt);
+    setCustomPrompt(prompt);
+  };
+
+  const generatePromptFromAnalysis = () => {
     if (!analysisData) return;
 
     const { bodyType, stylePreferences, colorPreferences, gender, occasion } = analysisData;
@@ -101,6 +159,47 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
     
     setCurrentPrompt(prompt);
     setCustomPrompt(prompt);
+  };
+
+  const generateImageFromOutfit = async () => {
+    if (!approvedOutfit) return;
+    
+    setIsGenerating(true);
+    setGeneratedImage(null);
+
+    try {
+      // Генерируем промпт на основе approved outfit
+      generatePromptFromOutfit();
+      
+      const request: ImageGenerationRequest = {
+        prompt: customPrompt || currentPrompt,
+        style: imageSettings.style,
+        quality: imageSettings.quality,
+        size: imageSettings.size,
+        aspectRatio: imageSettings.aspectRatio
+      };
+
+      console.log('🎨 Auto-generating image for outfit:', approvedOutfit.name);
+      console.log('📝 Prompt:', request.prompt);
+      
+      const result = await imageGenerationService.generateImage(request);
+      setGeneratedImage(result);
+      
+      if (onImageGenerated) {
+        onImageGenerated(result);
+      }
+      
+      console.log('✅ Auto image generation completed:', result);
+      
+    } catch (error) {
+      console.error('❌ Auto image generation failed:', error);
+      setGeneratedImage({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const generateImage = async () => {
