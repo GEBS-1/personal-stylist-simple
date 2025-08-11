@@ -6,6 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ui/use-toast";
 import { ShoppingBag, Star, Heart, ExternalLink, TestTube, Loader2 } from "lucide-react";
 import { wildberriesService, Product, SearchParams } from "@/services/wildberriesService";
+import { enhancedProductSearchService, ProductSearchResult, ProductSearchRequest } from "@/services/enhancedProductSearchService";
 import { BodyData } from "./ManualBodyInput";
 
 interface ProductCatalogProps {
@@ -14,8 +15,9 @@ interface ProductCatalogProps {
 }
 
 export default function ProductCatalog({ analysisData, generatedOutfit }: ProductCatalogProps) {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<ProductSearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [searchStats, setSearchStats] = useState<any>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -30,22 +32,26 @@ export default function ProductCatalog({ analysisData, generatedOutfit }: Produc
     setIsLoading(true);
     
     try {
-      const params: SearchParams = {
-        query: 'outfit-based',
-        bodyType: analysisData.bodyType,
-        occasion: 'casual',
-        budget: 'medium',
-        gender: analysisData.gender
+      console.log('🎨 Loading products for approved outfit:', generatedOutfit.name);
+      
+      const request: ProductSearchRequest = {
+        outfit: generatedOutfit,
+        maxResults: 20,
+        minRelevanceScore: 0.3,
+        preferredMarketplace: 'all'
       };
-
-      console.log('🎨 Loading products for generated outfit:', generatedOutfit.name);
-      const outfitProducts = await wildberriesService.getRecommendations(params, generatedOutfit);
+      
+      const outfitProducts = await enhancedProductSearchService.searchProductsForOutfit(request);
       setProducts(outfitProducts);
+      
+      // Получаем статистику поиска
+      const stats = enhancedProductSearchService.getSearchStats();
+      setSearchStats(stats);
       
       if (outfitProducts.length > 0) {
         toast({
           title: "Товары подобраны!",
-          description: `Найдено ${outfitProducts.length} товаров для вашего образа "${generatedOutfit.name}"`,
+          description: `Найдено ${outfitProducts.length} релевантных товаров для вашего образа "${generatedOutfit.name}"`,
         });
       } else {
         toast({
@@ -67,7 +73,7 @@ export default function ProductCatalog({ analysisData, generatedOutfit }: Produc
     }
   };
 
-  const handleProductClick = (product: Product) => {
+  const handleProductClick = (product: ProductSearchResult) => {
     window.open(product.url, '_blank');
   };
 
@@ -177,9 +183,16 @@ export default function ProductCatalog({ analysisData, generatedOutfit }: Produc
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Подобранные товары</CardTitle>
-            <Badge variant="secondary">
-              {products.length} товаров
-            </Badge>
+            <div className="flex items-center gap-2">
+              {searchStats && (
+                <Badge variant="outline" className="text-xs">
+                  Релевантность: {Math.round(searchStats.averageRelevance * 100)}%
+                </Badge>
+              )}
+              <Badge variant="secondary">
+                {products.length} товаров
+              </Badge>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -241,16 +254,33 @@ export default function ProductCatalog({ analysisData, generatedOutfit }: Produc
                         )}
                       </div>
 
-                      {/* Рейтинг */}
-                      {product.rating && (
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                          <span>{product.rating}</span>
-                          {product.reviews && (
-                            <span>({product.reviews})</span>
-                          )}
-                        </div>
-                      )}
+                      {/* Рейтинг и релевантность */}
+                      <div className="flex items-center justify-between">
+                        {product.rating && (
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                            <span>{product.rating}</span>
+                            {product.reviews && (
+                              <span>({product.reviews})</span>
+                            )}
+                          </div>
+                        )}
+                        
+                        {/* Оценка релевантности */}
+                        {product.relevanceScore && (
+                          <Badge 
+                            variant="outline" 
+                            className={`text-xs ${
+                              product.relevanceScore >= 0.8 ? 'bg-green-100 text-green-800' :
+                              product.relevanceScore >= 0.6 ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-red-100 text-red-800'
+                            }`}
+                            title={product.matchReason}
+                          >
+                            {Math.round(product.relevanceScore * 100)}% совпадение
+                          </Badge>
+                        )}
+                      </div>
 
                       {/* Размеры */}
                       {product.sizes && product.sizes.length > 0 && (
