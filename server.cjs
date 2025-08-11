@@ -125,6 +125,36 @@ app.get('/api/gigachat/test', async (req, res) => {
   }
 });
 
+// Тест подключения GigaChat
+app.get('/api/gigachat/test', async (req, res) => {
+  try {
+    const token = await getGigaChatToken();
+    
+    const response = await fetch(`${config.apiUrl}/models`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'RqUID': generateUUID()
+      },
+      agent: httpsAgent
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get models: ${response.status}`);
+    }
+
+    res.json({ success: true, message: 'GigaChat connection successful' });
+    
+  } catch (error) {
+    console.error('❌ GigaChat test failed:', error);
+    res.json({ 
+      success: false, 
+      fallback: true,
+      error: error.message 
+    });
+  }
+});
+
 // Получение моделей GigaChat
 app.get('/api/gigachat/models', async (req, res) => {
   try {
