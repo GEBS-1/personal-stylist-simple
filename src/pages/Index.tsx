@@ -10,11 +10,13 @@ import {
   Calculator,
   Palette,
   ShoppingBag,
-  Image as ImageIcon
+  Image as ImageIcon,
+  CheckCircle
 } from "lucide-react";
 import { ManualBodyInput, BodyData } from "@/components/fashion/ManualBodyInput";
 import { StylePreferences } from "@/components/fashion/StylePreferences";
 import { OutfitGenerator } from "@/components/fashion/OutfitGenerator";
+import { OutfitApproval } from "@/components/fashion/OutfitApproval";
 import { ImageGenerator } from "@/components/fashion/ImageGenerator";
 import ProductCatalog from "@/components/fashion/ProductCatalog";
 import TestAPI from "@/components/TestAPI";
@@ -29,7 +31,7 @@ interface AnalysisData extends BodyData {
 const Index = () => {
   console.log('🎯 Index component is rendering...');
   
-  const [activeStep, setActiveStep] = useState<'analysis' | 'preferences' | 'outfits' | 'images' | 'catalog' | 'test'>('analysis');
+  const [activeStep, setActiveStep] = useState<'analysis' | 'preferences' | 'outfits' | 'approval' | 'images' | 'catalog' | 'test'>('analysis');
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
   const [generatedOutfit, setGeneratedOutfit] = useState<any>(null);
@@ -48,6 +50,8 @@ const Index = () => {
     } else if (stepId === 'preferences') {
       setActiveStep('outfits');
     } else if (stepId === 'outfits') {
+      setActiveStep('approval');
+    } else if (stepId === 'approval') {
       setActiveStep('images');
     } else if (stepId === 'images') {
       setActiveStep('catalog');
@@ -65,7 +69,7 @@ const Index = () => {
     setActiveStep('preferences');
   };
 
-  const handleStepChange = (step: 'analysis' | 'preferences' | 'outfits' | 'images' | 'catalog' | 'test') => {
+  const handleStepChange = (step: 'analysis' | 'preferences' | 'outfits' | 'approval' | 'images' | 'catalog' | 'test') => {
     setActiveStep(step);
   };
 
@@ -102,9 +106,16 @@ const Index = () => {
       completed: completedSteps.has('outfits')
     },
     {
+      id: 'approval',
+      title: 'Одобрение образа',
+      description: 'Проверка и редактирование AI-образа',
+      icon: CheckCircle,
+      completed: completedSteps.has('approval')
+    },
+    {
       id: 'images',
       title: 'Генерация изображений',
-      description: 'Создание реалистичных образов',
+      description: 'Создание визуального образа (опционально)',
       icon: ImageIcon,
       completed: completedSteps.has('images')
     },
@@ -254,15 +265,34 @@ const Index = () => {
               />
             </TabsContent>
 
+            <TabsContent value="approval" className="space-y-8">
+              <div className="text-center mb-8">
+                <h2 className="font-display text-3xl font-bold mb-4">Одобрение образа</h2>
+                <p className="text-muted-foreground max-w-2xl mx-auto">
+                  Проверьте и при необходимости отредактируйте созданный ИИ образ
+                </p>
+              </div>
+              {generatedOutfit && (
+                <OutfitApproval 
+                  outfit={generatedOutfit}
+                  onApprove={(outfit) => handleStepComplete('approval', outfit)}
+                  onRegenerate={() => setActiveStep('outfits')}
+                  onEdit={(outfit) => setGeneratedOutfit(outfit)}
+                  onReject={() => setActiveStep('outfits')}
+                />
+              )}
+            </TabsContent>
+
             <TabsContent value="images" className="space-y-8">
               <div className="text-center mb-8">
                 <h2 className="font-display text-3xl font-bold mb-4">Генерация изображений</h2>
                 <p className="text-muted-foreground max-w-2xl mx-auto">
-                  Создайте реалистичные изображения ваших образов с помощью ИИ
+                  Создайте визуальный образ вашего наряда (автоматически на основе одобренного образа)
                 </p>
               </div>
               <ImageGenerator 
                 analysisData={analysisData}
+                approvedOutfit={generatedOutfit}
                 onImageGenerated={(image) => handleStepComplete('images', image)} 
               />
             </TabsContent>

@@ -18,16 +18,18 @@ import {
   Edit3,
   Sparkles
 } from 'lucide-react';
-import { createGigaChatService, ImageGenerationRequest, ImageGenerationResponse } from '@/services/gigaChatService';
-import { env, supportsImageGeneration } from '@/config/env';
+import { imageGenerationService, ImageGenerationRequest, ImageGenerationResponse } from '@/services/imageGenerationService';
+import { env } from '@/config/env';
 
 interface ImageGeneratorProps {
   analysisData: any;
+  approvedOutfit?: any; // Добавляем approved outfit
   onImageGenerated?: (image: ImageGenerationResponse) => void;
 }
 
 export const ImageGenerator: React.FC<ImageGeneratorProps> = ({ 
   analysisData, 
+  approvedOutfit,
   onImageGenerated 
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
@@ -40,48 +42,90 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
     size: '1024x1024' as const,
     aspectRatio: '1:1' as const
   });
-  const [gigaChatService, setGigaChatService] = useState<any>(null);
   const [serviceStatus, setServiceStatus] = useState<'loading' | 'available' | 'error' | 'unavailable'>('loading');
 
   useEffect(() => {
-    initializeGigaChat();
+    initializeImageService();
     generateInitialPrompt();
-  }, [analysisData]);
+  }, [analysisData, approvedOutfit]);
 
-  const initializeGigaChat = async () => {
-    console.log('🔍 Initializing GigaChat...');
-    console.log('🔑 Environment check:', {
-      supportsImageGeneration: supportsImageGeneration(),
-      env: {
-        clientId: import.meta.env.VITE_GIGACHAT_CLIENT_ID ? '✅ Present' : '❌ Missing',
-        clientSecret: import.meta.env.VITE_GIGACHAT_CLIENT_SECRET ? '✅ Present' : '❌ Missing'
-      }
-    });
-    
-    if (!supportsImageGeneration()) {
-      console.log('❌ Image generation not supported');
-      setServiceStatus('unavailable');
-      return;
+  useEffect(() => {
+    // Автоматически запускаем генерацию при наличии approved outfit
+    if (approvedOutfit && !generatedImage && !isGenerating) {
+      generateImageFromOutfit();
     }
+  }, [approvedOutfit]);
 
+  const initializeImageService = async () => {
     try {
-      const service = createGigaChatService();
-      if (service) {
-        setGigaChatService(service);
-        
-        // Проверяем поддержку генерации изображений
-        const supportsImages = await service.supportsImageGeneration();
-        setServiceStatus(supportsImages ? 'available' : 'unavailable');
+      const availableProviders = imageGenerationService.getAvailableProviders();
+      const currentProvider = imageGenerationService.getCurrentProvider();
+      
+      if (availableProviders.length > 0) {
+        setServiceStatus('available');
       } else {
         setServiceStatus('unavailable');
       }
     } catch (error) {
-      console.error('Failed to initialize GigaChat:', error);
       setServiceStatus('error');
     }
   };
 
   const generateInitialPrompt = () => {
+    if (approvedOutfit) {
+      // Используем данные из approved outfit для создания промпта
+      generatePromptFromOutfit();
+    } else if (analysisData) {
+      // Используем базовые данные анализа
+      generatePromptFromAnalysis();
+    }
+  };
+
+  const generatePromptFromOutfit = (): string => {
+    if (!approvedOutfit) {
+      return '';
+    }
+    
+    const { name, description, items, colorPalette, styleNotes } = approvedOutfit;
+    const { gender } = analysisData || {};
+    
+    let prompt = `Стильный человек ${gender === 'female' ? 'женского' : 'мужского'} пола`;
+    
+    // Добавляем описание образа
+    if (description) {
+      prompt += ` в образе: ${description}`;
+    } else if (name) {
+      prompt += ` в образе: ${name}`;
+    }
+    
+    // Добавляем детали одежды
+    if (items && items.length > 0) {
+      prompt += '. Одежда включает: ';
+      items.forEach((item: any, index: number) => {
+        prompt += `${item.name} ${item.colors ? `в цветах ${item.colors.join(', ')}` : ''}`;
+        if (index < items.length - 1) prompt += ', ';
+      });
+    }
+    
+    // Добавляем цветовую палитру
+    if (colorPalette && colorPalette.length > 0) {
+      prompt += `. Цветовая палитра: ${colorPalette.join(', ')}`;
+    }
+    
+    // Добавляем стилевые заметки
+    if (styleNotes) {
+      prompt += `. ${styleNotes}`;
+    }
+    
+    prompt += '. Одежда должна быть современной, стильной и хорошо сидеть по фигуре.';
+    
+    setCurrentPrompt(prompt);
+    setCustomPrompt(prompt);
+    
+    return prompt;
+  };
+
+  const generatePromptFromAnalysis = () => {
     if (!analysisData) return;
 
     const { bodyType, stylePreferences, colorPreferences, gender, occasion } = analysisData;
@@ -110,25 +154,67 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
     setCustomPrompt(prompt);
   };
 
+  const generateImageFromOutfit = async () => {
+    if (!approvedOutfit) return;
+    
+    setIsGenerating(true);
+    setGeneratedImage(null);
+
+    try {
+      // Генерируем промпт на основе approved outfit и получаем его сразу
+      const generatedPrompt = generatePromptFromOutfit();
+      
+      const request: ImageGenerationRequest = {
+        prompt: generatedPrompt || customPrompt || currentPrompt,
+        style: imageSettings.style,
+        quality: imageSettings.quality,
+        size: imageSettings.size,
+        aspectRatio: imageSettings.aspectRatio
+      };
+      
+      // Проверяем, что промпт не пустой
+      if (!request.prompt || request.prompt.trim() === '') {
+        request.prompt = `Стильный человек в образе: ${approvedOutfit.name || 'модный образ'}. ${approvedOutfit.description || ''}`;
+      }
+      
+      const result = await imageGenerationService.generateImage(request);
+      setGeneratedImage(result);
+      
+      if (onImageGenerated) {
+        onImageGenerated(result);
+      }
+      
+    } catch (error) {
+      setGeneratedImage({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const generateImage = async () => {
-    if (!gigaChatService || !customPrompt.trim()) return;
+    if (!customPrompt.trim()) {
+      alert('Пожалуйста, введите описание для генерации изображения');
+      return;
+    }
 
     setIsGenerating(true);
+    setGeneratedImage(null);
+
     try {
       const request: ImageGenerationRequest = {
         prompt: customPrompt,
         style: imageSettings.style,
         quality: imageSettings.quality,
         size: imageSettings.size,
-        aspectRatio: imageSettings.aspectRatio,
-        bodyType: analysisData?.bodyType,
-        clothingStyle: analysisData?.stylePreferences?.join(', '),
-        colorScheme: analysisData?.colorPreferences?.join(', ')
+        aspectRatio: imageSettings.aspectRatio
       };
 
       console.log('🎨 Generating image with request:', request);
       
-      const result = await gigaChatService.generateImage(request);
+      const result = await imageGenerationService.generateImage(request);
       setGeneratedImage(result);
       
       if (onImageGenerated) {
@@ -221,17 +307,24 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
             <AlertCircle className="w-12 h-12 text-blue-500 mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">Генерация изображений недоступна</h3>
             <p className="text-gray-600 mb-4">
-              Для использования этой функции необходимо настроить GigaChat API
+              Для использования этой функции необходимо настроить API ключи для генерации изображений
             </p>
             <div className="text-sm text-gray-500">
-              <p>Добавьте в файл .env:</p>
-              <code className="bg-gray-100 px-2 py-1 rounded">
-                VITE_GIGACHAT_CLIENT_ID=ваш_ключ
-              </code>
-              <br />
-              <code className="bg-gray-100 px-2 py-1 rounded">
-                VITE_GIGACHAT_CLIENT_SECRET=ваш_секрет
-              </code>
+              <p>Добавьте в файл .env один из вариантов:</p>
+              <div className="space-y-2">
+                <div>
+                  <p className="font-medium">OpenAI DALL-E:</p>
+                  <code className="bg-gray-100 px-2 py-1 rounded">
+                    VITE_OPENAI_API_KEY=ваш_ключ
+                  </code>
+                </div>
+                <div>
+                  <p className="font-medium">GigaChat (только текст):</p>
+                  <code className="bg-gray-100 px-2 py-1 rounded">
+                    VITE_GIGACHAT_CLIENT_ID=ваш_ключ
+                  </code>
+                </div>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -362,25 +455,36 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
           </p>
         </div>
 
-        {/* Кнопка генерации */}
-        <Button 
-          onClick={generateImage} 
-          disabled={isGenerating || !customPrompt.trim() || serviceStatus !== 'available'}
-          className="w-full"
-          size="lg"
-        >
-          {isGenerating ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Генерирую изображение...
-            </>
-          ) : (
-            <>
-              <Sparkles className="w-4 h-4 mr-2" />
-              Создать образ
-            </>
-          )}
-        </Button>
+        {/* Кнопки действий */}
+        <div className="flex gap-2">
+          <Button 
+            onClick={generateImage} 
+            disabled={isGenerating || !customPrompt.trim() || serviceStatus !== 'available'}
+            className="flex-1"
+            size="lg"
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Генерирую изображение...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 mr-2" />
+                Создать образ
+              </>
+            )}
+          </Button>
+          
+          <Button 
+            variant="outline"
+            onClick={() => onImageGenerated && onImageGenerated({ success: true, imageUrl: '/placeholder.svg', model: 'skipped' })}
+            className="flex-1"
+            size="lg"
+          >
+            Пропустить
+          </Button>
+        </div>
 
         {/* Результат генерации */}
         {generatedImage && (

@@ -29,7 +29,7 @@ const TestAPI: React.FC = () => {
   });
   const [testResult, setTestResult] = useState<string>('');
 
-  const aiService = new AIService();
+  const aiService = AIService.getInstance();
   const marketplaceService = new EnhancedMarketplaceService();
 
   useEffect(() => {

@@ -37,16 +37,32 @@ export interface GeneratedOutfit {
 type AIProvider = 'openai' | 'gemini' | 'claude' | 'cohere' | 'local' | 'simulation' | 'gigachat';
 
 export class AIService {
+  private static instance: AIService | null = null;
   private currentProvider: AIProvider = 'simulation';
   private apiKeys: ReturnType<typeof getValidApiKeys>;
   private responseTimes: Partial<Record<AIProvider, number[]>> = {};
   private gigaChatService: GigaChatService | null = null;
+  private initialized = false;
+  private providerTestCache = new Map<AIProvider, { available: boolean, timestamp: number }>();
+  private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 минут
 
   constructor() {
+    if (AIService.instance) {
+      return AIService.instance;
+    }
+    
     console.log('🚀 Initializing AI Service...');
     this.loadAPIKeys();
     this.gigaChatService = createGigaChatService();
     this.initializeProvider();
+    AIService.instance = this;
+  }
+
+  public static getInstance(): AIService {
+    if (!AIService.instance) {
+      AIService.instance = new AIService();
+    }
+    return AIService.instance;
   }
 
   private loadAPIKeys() {
@@ -58,48 +74,56 @@ export class AIService {
   }
 
   private async initializeProvider() {
-    console.log('🔧 Initializing AI provider...');
-    
-    // Используем только GigaChat по требованию пользователя
-    const providers: AIProvider[] = [
-      'gigachat',    // 🥇 Единственный активный провайдер - GigaChat
-      'simulation'   // 🎭 Fallback - только если GigaChat недоступен
-    ];
-    
-    for (const provider of providers) {
-      console.log(`🧪 Testing ${provider}...`);
-      const isAvailable = await this.testProvider(provider);
-      
-      if (isAvailable) {
-        this.currentProvider = provider;
-        console.log(`✅ Selected ${provider} as AI provider`);
-        return;
-      }
-      
-      console.log(`❌ ${provider} is not available`);
+    if (this.initialized) {
+      return;
     }
     
-    // Если ничего не работает, используем симуляцию
-    this.currentProvider = 'simulation';
-    console.log('🎭 Using simulation mode as fallback');
+    // Быстрая инициализация - проверяем только GigaChat
+    const isGigaChatAvailable = await this.testProvider('gigachat');
+    
+    if (isGigaChatAvailable) {
+      this.currentProvider = 'gigachat';
+    } else {
+      this.currentProvider = 'simulation';
+    }
+    
+    this.initialized = true;
   }
 
   private async testProvider(provider: AIProvider): Promise<boolean> {
-    console.log(`🧪 Testing ${provider} provider...`);
+    // Проверяем кэш
+    const cached = this.providerTestCache.get(provider);
+    if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
+      return cached.available;
+    }
     
     try {
+      let isAvailable = false;
+      
       switch (provider) {
         case 'gigachat':
-          return await this.testGigaChat();
+          isAvailable = await this.testGigaChat();
+          break;
         case 'simulation':
-          return true; // Симуляция всегда доступна
+          isAvailable = true;
+          break;
         default:
-          // Все остальные провайдеры отключены по требованию пользователя
-          console.log(`🚫 ${provider} is disabled - using only GigaChat`);
-          return false;
+          isAvailable = false;
       }
+      
+      // Кэшируем результат
+      this.providerTestCache.set(provider, {
+        available: isAvailable,
+        timestamp: Date.now()
+      });
+      
+      return isAvailable;
     } catch (error) {
-      console.error(`❌ ${provider} test failed:`, error);
+      // Кэшируем отрицательный результат
+      this.providerTestCache.set(provider, {
+        available: false,
+        timestamp: Date.now()
+      });
       return false;
     }
   }
@@ -306,6 +330,12 @@ export class AIService {
         console.log('🔄 GigaChat failed, switching to simulation mode...');
         this.currentProvider = 'simulation';
         return this.simulateResponse(request);
+      }
+      
+      // Для simulation режима тоже возвращаем fallback
+      if (this.currentProvider === 'simulation') {
+        console.log('🔄 Simulation failed, using emergency fallback...');
+        return this.createEmergencyFallback(request);
       }
       
       throw error;
@@ -1043,9 +1073,21 @@ ${isMale ? `
       throw new Error('Request object is required for simulation');
     }
     
+    // Проверяем measurements, но не выбрасываем ошибку
     if (!request.measurements || !request.measurements.gender) {
-      console.error('❌ Request measurements or gender is missing');
-      throw new Error('Request measurements and gender are required for simulation');
+      console.warn('⚠️ Request measurements or gender is missing, using defaults');
+      // Устанавливаем значения по умолчанию
+      if (!request.measurements) {
+        request.measurements = {
+          height: 170,
+          weight: 65,
+          gender: 'female',
+          season: 'spring',
+          shoeSize: 38
+        };
+      } else if (!request.measurements.gender) {
+        request.measurements.gender = 'female';
+      }
     }
     
     console.log('📊 User data:', {
@@ -1135,6 +1177,64 @@ ${isMale ? `
       items: outfit.items.map(item => `${item.category}: ${item.name}`)
     });
     
+    return outfit;
+  }
+
+  private createEmergencyFallback(request: OutfitRequest): GeneratedOutfit {
+    console.log('🚨 Creating emergency fallback outfit...');
+    
+    // Создаем базовый fallback образ
+    const outfit: GeneratedOutfit = {
+      id: `emergency_${Date.now()}`,
+      name: 'Стильный базовый образ',
+      description: 'Классический образ, подходящий для большинства случаев',
+      occasion: request.occasion || 'casual',
+      season: request.season || 'spring',
+      items: [
+        {
+          category: 'Верх',
+          name: 'Базовая футболка',
+          description: 'Универсальная футболка нейтрального цвета',
+          colors: ['белый', 'черный'],
+          style: 'casual',
+          fit: 'regular',
+          price: '1500 ₽'
+        },
+        {
+          category: 'Низ',
+          name: 'Джинсы классического кроя',
+          description: 'Универсальные джинсы прямого кроя',
+          colors: ['синий'],
+          style: 'casual',
+          fit: 'regular',
+          price: '3000 ₽'
+        },
+        {
+          category: 'Обувь',
+          name: 'Кроссовки на плоской подошве',
+          description: 'Удобные кроссовки для повседневной носки',
+          colors: ['белый'],
+          style: 'casual',
+          fit: 'regular',
+          price: '2500 ₽'
+        },
+        {
+          category: 'Аксессуары',
+          name: 'Сумка через плечо',
+          description: 'Практичная сумка среднего размера',
+          colors: ['черный'],
+          style: 'casual',
+          fit: 'regular',
+          price: '2000 ₽'
+        }
+      ],
+      totalPrice: '9000 ₽',
+      styleNotes: 'Базовый образ подходит для повседневной носки и различных случаев',
+      colorPalette: ['белый', 'черный', 'синий'],
+      confidence: 0.7
+    };
+    
+    console.log('✅ Emergency fallback outfit created');
     return outfit;
   }
 
@@ -1500,4 +1600,4 @@ ${isMale ? `
   }
 }
 
-export const aiService = new AIService(); 
+export const aiService = AIService.getInstance(); 
