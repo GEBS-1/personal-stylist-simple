@@ -101,7 +101,7 @@ export class ImageGenerationService {
     try {
       const prompt = this.buildGigaChatPrompt(request);
       
-      const response = await fetch('http://localhost:3001/api/gigachat/image', {
+      const response = await fetch('http://localhost:3001/api/gigachat/images', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -110,7 +110,8 @@ export class ImageGenerationService {
           prompt,
           style: request.style || 'realistic',
           quality: request.quality || 'standard',
-          size: request.size || '1024x1024'
+          size: request.size || '1024x1024',
+          aspectRatio: request.aspectRatio || '1:1'
         })
       });
 
@@ -124,7 +125,7 @@ export class ImageGenerationService {
         return {
           success: true,
           imageUrl: data.imageUrl,
-          model: 'gigachat',
+          model: data.model || 'gigachat',
           usage: data.usage
         };
       } else {
