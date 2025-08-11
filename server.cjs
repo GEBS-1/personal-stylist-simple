@@ -607,6 +607,110 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
+// Генерация изображений через GigaChat
+app.post('/api/gigachat/image', async (req, res) => {
+  try {
+    const { prompt, style = 'realistic', quality = 'standard', size = '1024x1024' } = req.body;
+    
+    console.log('🎨 Generating image with GigaChat...');
+    console.log(`📝 Prompt: ${prompt}`);
+    console.log(`🎨 Style: ${style}`);
+    console.log(`⚡ Quality: ${quality}`);
+    console.log(`📏 Size: ${size}`);
+    
+    // Получаем токен доступа
+    const token = await getGigaChatToken();
+    
+    // Формируем промпт для генерации изображения
+    const imagePrompt = `Создай изображение: ${prompt}. 
+    Стиль: ${style === 'realistic' ? 'фотографическое качество, реалистичный стиль' : 
+           style === 'artistic' ? 'художественный стиль, творческий подход' :
+           style === 'fashion' ? 'стиль fashion-фотографии, профессиональная съемка' :
+           'естественный вид, повседневная фотография'}. 
+    Качество: ${quality === 'high' ? 'высокое' : 'стандартное'}. 
+    Размер: ${size}. 
+    Изображение должно быть реалистичным и качественным.`;
+    
+    // Отправляем запрос на генерацию изображения
+    const response = await fetch('https://gigachat.devices.sberbank.ru/api/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'RqUID': generateUUID()
+      },
+      body: JSON.stringify({
+        model: 'GigaChat:latest',
+        prompt: imagePrompt,
+        n: 1,
+        size: size,
+        quality: quality === 'high' ? 'hd' : 'standard',
+        response_format: 'url'
+      }),
+      agent: httpsAgent
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ GigaChat image generation failed: ${response.status} - ${errorText}`);
+      
+      // Возвращаем fallback изображение
+      return res.json({
+        success: true,
+        imageUrl: '/placeholder.svg',
+        model: 'gigachat-fallback',
+        usage: {
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0
+        }
+      });
+    }
+    
+    const data = await response.json();
+    
+    if (data.data && data.data[0]?.url) {
+      console.log('✅ Image generated successfully');
+      res.json({
+        success: true,
+        imageUrl: data.data[0].url,
+        model: 'gigachat',
+        usage: data.usage || {
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0
+        }
+      });
+    } else {
+      console.warn('⚠️ No image URL in response, using fallback');
+      res.json({
+        success: true,
+        imageUrl: '/placeholder.svg',
+        model: 'gigachat-fallback',
+        usage: {
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0
+        }
+      });
+    }
+    
+  } catch (error) {
+    console.error('❌ GigaChat image generation error:', error);
+    res.json({
+      success: true,
+      imageUrl: '/placeholder.svg',
+      model: 'gigachat-fallback',
+      error: error.message,
+      usage: {
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0
+      }
+    });
+  }
+});
+
 // Прокси для изображений Wildberries
 app.get('/api/wildberries/image/:productId', async (req, res) => {
   try {

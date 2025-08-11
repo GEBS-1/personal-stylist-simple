@@ -1,6 +1,13 @@
 // Тестирование GigaChat API
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
+const fetch = require('node-fetch');
+
+// Создаем HTTPS агент, который игнорирует SSL сертификаты
+const httpsAgent = new https.Agent({
+  rejectUnauthorized: false
+});
 
 // Загружаем переменные окружения
 const envPath = path.join(__dirname, '.env');
@@ -54,7 +61,8 @@ async function getAccessToken() {
         'RqUID': generateRqUID(),
         'Authorization': `Basic ${Buffer.from(`${config.clientId}:${config.clientSecret}`).toString('base64')}`
       },
-      body: authData.toString()
+      body: authData.toString(),
+      agent: httpsAgent
     });
 
     if (!response.ok) {
@@ -89,7 +97,8 @@ async function testConnection() {
       headers: {
         'Authorization': `Bearer ${token}`,
         'RqUID': generateRqUID()
-      }
+      },
+      agent: httpsAgent
     });
 
     if (!response.ok) {
@@ -143,7 +152,8 @@ async function testTextGeneration(token) {
         'Authorization': `Bearer ${token}`,
         'RqUID': generateRqUID()
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify(requestBody),
+      agent: httpsAgent
     });
 
     if (!response.ok) {

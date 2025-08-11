@@ -18,8 +18,8 @@ import {
   Edit3,
   Sparkles
 } from 'lucide-react';
-import { createGigaChatService, ImageGenerationRequest, ImageGenerationResponse } from '@/services/gigaChatService';
-import { env, supportsImageGeneration } from '@/config/env';
+import { imageGenerationService, ImageGenerationRequest, ImageGenerationResponse } from '@/services/imageGenerationService';
+import { env } from '@/config/env';
 
 interface ImageGeneratorProps {
   analysisData: any;
@@ -40,43 +40,36 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
     size: '1024x1024' as const,
     aspectRatio: '1:1' as const
   });
-  const [gigaChatService, setGigaChatService] = useState<any>(null);
   const [serviceStatus, setServiceStatus] = useState<'loading' | 'available' | 'error' | 'unavailable'>('loading');
 
   useEffect(() => {
-    initializeGigaChat();
+    initializeImageService();
     generateInitialPrompt();
   }, [analysisData]);
 
-  const initializeGigaChat = async () => {
-    console.log('🔍 Initializing GigaChat...');
+  const initializeImageService = async () => {
+    console.log('🔍 Initializing Image Generation Service...');
     console.log('🔑 Environment check:', {
-      supportsImageGeneration: supportsImageGeneration(),
       env: {
         clientId: import.meta.env.VITE_GIGACHAT_CLIENT_ID ? '✅ Present' : '❌ Missing',
         clientSecret: import.meta.env.VITE_GIGACHAT_CLIENT_SECRET ? '✅ Present' : '❌ Missing'
       }
     });
     
-    if (!supportsImageGeneration()) {
-      console.log('❌ Image generation not supported');
-      setServiceStatus('unavailable');
-      return;
-    }
-
     try {
-      const service = createGigaChatService();
-      if (service) {
-        setGigaChatService(service);
-        
-        // Проверяем поддержку генерации изображений
-        const supportsImages = await service.supportsImageGeneration();
-        setServiceStatus(supportsImages ? 'available' : 'unavailable');
+      const availableProviders = imageGenerationService.getAvailableProviders();
+      const currentProvider = imageGenerationService.getCurrentProvider();
+      
+      console.log(`✅ Available providers: ${availableProviders.join(', ')}`);
+      console.log(`🎯 Current provider: ${currentProvider}`);
+      
+      if (availableProviders.length > 0) {
+        setServiceStatus('available');
       } else {
         setServiceStatus('unavailable');
       }
     } catch (error) {
-      console.error('Failed to initialize GigaChat:', error);
+      console.error('Failed to initialize Image Service:', error);
       setServiceStatus('error');
     }
   };
@@ -111,24 +104,26 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
   };
 
   const generateImage = async () => {
-    if (!gigaChatService || !customPrompt.trim()) return;
+    if (!customPrompt.trim()) {
+      alert('Пожалуйста, введите описание для генерации изображения');
+      return;
+    }
 
     setIsGenerating(true);
+    setGeneratedImage(null);
+
     try {
       const request: ImageGenerationRequest = {
         prompt: customPrompt,
         style: imageSettings.style,
         quality: imageSettings.quality,
         size: imageSettings.size,
-        aspectRatio: imageSettings.aspectRatio,
-        bodyType: analysisData?.bodyType,
-        clothingStyle: analysisData?.stylePreferences?.join(', '),
-        colorScheme: analysisData?.colorPreferences?.join(', ')
+        aspectRatio: imageSettings.aspectRatio
       };
 
       console.log('🎨 Generating image with request:', request);
       
-      const result = await gigaChatService.generateImage(request);
+      const result = await imageGenerationService.generateImage(request);
       setGeneratedImage(result);
       
       if (onImageGenerated) {
