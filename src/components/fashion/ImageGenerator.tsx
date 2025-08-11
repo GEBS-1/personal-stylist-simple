@@ -94,10 +94,10 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
     }
   };
 
-  const generatePromptFromOutfit = () => {
+  const generatePromptFromOutfit = (): string => {
     if (!approvedOutfit) {
       console.warn('⚠️ No approved outfit available for prompt generation');
-      return;
+      return '';
     }
 
     console.log('🔍 Generating prompt from outfit:', approvedOutfit);
@@ -139,6 +139,8 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
     
     setCurrentPrompt(prompt);
     setCustomPrompt(prompt);
+    
+    return prompt;
   };
 
   const generatePromptFromAnalysis = () => {
@@ -177,14 +179,11 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
     setGeneratedImage(null);
 
     try {
-      // Генерируем промпт на основе approved outfit
-      generatePromptFromOutfit();
-      
-      // Ждем немного, чтобы промпт установился
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Генерируем промпт на основе approved outfit и получаем его сразу
+      const generatedPrompt = generatePromptFromOutfit();
       
       const request: ImageGenerationRequest = {
-        prompt: customPrompt || currentPrompt,
+        prompt: generatedPrompt || customPrompt || currentPrompt,
         style: imageSettings.style,
         quality: imageSettings.quality,
         size: imageSettings.size,
