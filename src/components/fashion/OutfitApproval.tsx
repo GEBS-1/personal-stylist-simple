@@ -150,10 +150,9 @@ export const OutfitApproval: React.FC<OutfitApprovalProps> = ({
             {editedOutfit.items.map((item, index) => (
               <Card key={index} className="p-4">
                 <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline">{item.category}</Badge>
-                    <span className="text-sm text-gray-500">{item.price} ₽</span>
-                  </div>
+                                     <div className="flex items-center gap-2">
+                     <Badge variant="outline">{item.category}</Badge>
+                   </div>
                   
                   {isEditing ? (
                     <div className="space-y-2">
@@ -251,10 +250,7 @@ export const OutfitApproval: React.FC<OutfitApprovalProps> = ({
             )}
           </div>
           
-          <div className="flex items-center gap-2">
-            <Label className="text-sm font-medium">Общая стоимость:</Label>
-            <span className="text-lg font-semibold text-green-600">{outfit.totalPrice} ₽</span>
-          </div>
+
         </div>
 
         <Separator />

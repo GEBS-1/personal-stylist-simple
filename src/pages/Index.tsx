@@ -115,7 +115,7 @@ const Index = () => {
     {
       id: 'images',
       title: 'Генерация изображений',
-      description: 'Создание реалистичных образов',
+      description: 'Создание визуального образа (опционально)',
       icon: ImageIcon,
       completed: completedSteps.has('images')
     },
@@ -287,7 +287,7 @@ const Index = () => {
               <div className="text-center mb-8">
                 <h2 className="font-display text-3xl font-bold mb-4">Генерация изображений</h2>
                 <p className="text-muted-foreground max-w-2xl mx-auto">
-                  Создайте реалистичные изображения ваших образов с помощью ИИ
+                  Создайте визуальный образ вашего наряда (опциональный шаг)
                 </p>
               </div>
               <ImageGenerator 

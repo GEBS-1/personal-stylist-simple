@@ -216,17 +216,24 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
             <AlertCircle className="w-12 h-12 text-blue-500 mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">Генерация изображений недоступна</h3>
             <p className="text-gray-600 mb-4">
-              Для использования этой функции необходимо настроить GigaChat API
+              Для использования этой функции необходимо настроить API ключи для генерации изображений
             </p>
             <div className="text-sm text-gray-500">
-              <p>Добавьте в файл .env:</p>
-              <code className="bg-gray-100 px-2 py-1 rounded">
-                VITE_GIGACHAT_CLIENT_ID=ваш_ключ
-              </code>
-              <br />
-              <code className="bg-gray-100 px-2 py-1 rounded">
-                VITE_GIGACHAT_CLIENT_SECRET=ваш_секрет
-              </code>
+              <p>Добавьте в файл .env один из вариантов:</p>
+              <div className="space-y-2">
+                <div>
+                  <p className="font-medium">OpenAI DALL-E:</p>
+                  <code className="bg-gray-100 px-2 py-1 rounded">
+                    VITE_OPENAI_API_KEY=ваш_ключ
+                  </code>
+                </div>
+                <div>
+                  <p className="font-medium">GigaChat (только текст):</p>
+                  <code className="bg-gray-100 px-2 py-1 rounded">
+                    VITE_GIGACHAT_CLIENT_ID=ваш_ключ
+                  </code>
+                </div>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -357,25 +364,36 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
           </p>
         </div>
 
-        {/* Кнопка генерации */}
-        <Button 
-          onClick={generateImage} 
-          disabled={isGenerating || !customPrompt.trim() || serviceStatus !== 'available'}
-          className="w-full"
-          size="lg"
-        >
-          {isGenerating ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Генерирую изображение...
-            </>
-          ) : (
-            <>
-              <Sparkles className="w-4 h-4 mr-2" />
-              Создать образ
-            </>
-          )}
-        </Button>
+        {/* Кнопки действий */}
+        <div className="flex gap-2">
+          <Button 
+            onClick={generateImage} 
+            disabled={isGenerating || !customPrompt.trim() || serviceStatus !== 'available'}
+            className="flex-1"
+            size="lg"
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Генерирую изображение...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 mr-2" />
+                Создать образ
+              </>
+            )}
+          </Button>
+          
+          <Button 
+            variant="outline"
+            onClick={() => onImageGenerated && onImageGenerated({ success: true, imageUrl: '/placeholder.svg', model: 'skipped' })}
+            className="flex-1"
+            size="lg"
+          >
+            Пропустить
+          </Button>
+        </div>
 
         {/* Результат генерации */}
         {generatedImage && (

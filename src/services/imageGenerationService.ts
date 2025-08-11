@@ -34,8 +34,8 @@ export class ImageGenerationService {
   private initializeProvider() {
     // Проверяем доступность провайдеров
     const providers = [
-      { name: 'gigachat', available: this.checkGigaChatAvailability() },
       { name: 'dalle', available: this.checkDalleAvailability() },
+      { name: 'gigachat', available: this.checkGigaChatAvailability() },
       { name: 'stable-diffusion', available: this.checkStableDiffusionAvailability() },
       { name: 'midjourney', available: this.checkMidjourneyAvailability() },
       { name: 'leonardo', available: this.checkLeonardoAvailability() }
