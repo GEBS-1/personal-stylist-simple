@@ -32,14 +32,19 @@ export class ImageGenerationService {
   }
 
   private initializeProvider() {
-    // Проверяем доступность провайдеров
+    // Проверяем доступность провайдеров (GigaChat имеет приоритет)
     const providers = [
-      { name: 'dalle', available: this.checkDalleAvailability() },
       { name: 'gigachat', available: this.checkGigaChatAvailability() },
+      { name: 'dalle', available: this.checkDalleAvailability() },
       { name: 'stable-diffusion', available: this.checkStableDiffusionAvailability() },
       { name: 'midjourney', available: this.checkMidjourneyAvailability() },
       { name: 'leonardo', available: this.checkLeonardoAvailability() }
     ];
+
+    console.log('🔍 Checking image generation providers:');
+    providers.forEach(p => {
+      console.log(`  ${p.name}: ${p.available ? '✅' : '❌'}`);
+    });
 
     const availableProvider = providers.find(p => p.available);
     if (availableProvider) {

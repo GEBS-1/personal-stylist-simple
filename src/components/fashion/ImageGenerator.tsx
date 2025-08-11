@@ -95,8 +95,13 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
   };
 
   const generatePromptFromOutfit = () => {
-    if (!approvedOutfit) return;
+    if (!approvedOutfit) {
+      console.warn('⚠️ No approved outfit available for prompt generation');
+      return;
+    }
 
+    console.log('🔍 Generating prompt from outfit:', approvedOutfit);
+    
     const { name, description, items, colorPalette, styleNotes } = approvedOutfit;
     const { gender } = analysisData || {};
     
@@ -105,6 +110,8 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
     // Добавляем описание образа
     if (description) {
       prompt += ` в образе: ${description}`;
+    } else if (name) {
+      prompt += ` в образе: ${name}`;
     }
     
     // Добавляем детали одежды
@@ -127,6 +134,8 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
     }
     
     prompt += '. Одежда должна быть современной, стильной и хорошо сидеть по фигуре.';
+    
+    console.log('📝 Generated prompt:', prompt);
     
     setCurrentPrompt(prompt);
     setCustomPrompt(prompt);
@@ -171,6 +180,9 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
       // Генерируем промпт на основе approved outfit
       generatePromptFromOutfit();
       
+      // Ждем немного, чтобы промпт установился
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       const request: ImageGenerationRequest = {
         prompt: customPrompt || currentPrompt,
         style: imageSettings.style,
@@ -181,6 +193,12 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
 
       console.log('🎨 Auto-generating image for outfit:', approvedOutfit.name);
       console.log('📝 Prompt:', request.prompt);
+      
+      // Проверяем, что промпт не пустой
+      if (!request.prompt || request.prompt.trim() === '') {
+        console.warn('⚠️ Empty prompt detected, generating fallback prompt');
+        request.prompt = `Стильный человек в образе: ${approvedOutfit.name || 'модный образ'}. ${approvedOutfit.description || ''}`;
+      }
       
       const result = await imageGenerationService.generateImage(request);
       setGeneratedImage(result);
