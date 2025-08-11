@@ -87,7 +87,8 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
   const generateInitialPrompt = () => {
     if (approvedOutfit) {
       // Используем данные из approved outfit для создания промпта
-      generatePromptFromOutfit();
+      const prompt = generatePromptFromOutfit();
+      console.log('🎯 Initial prompt generated:', prompt);
     } else if (analysisData) {
       // Используем базовые данные анализа
       generatePromptFromAnalysis();
@@ -182,6 +183,10 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
       // Генерируем промпт на основе approved outfit и получаем его сразу
       const generatedPrompt = generatePromptFromOutfit();
       
+      console.log('🔍 Generated prompt:', generatedPrompt);
+      console.log('🔍 Current customPrompt:', customPrompt);
+      console.log('🔍 Current currentPrompt:', currentPrompt);
+      
       const request: ImageGenerationRequest = {
         prompt: generatedPrompt || customPrompt || currentPrompt,
         style: imageSettings.style,
@@ -191,12 +196,13 @@ export const ImageGenerator: React.FC<ImageGeneratorProps> = ({
       };
 
       console.log('🎨 Auto-generating image for outfit:', approvedOutfit.name);
-      console.log('📝 Prompt:', request.prompt);
+      console.log('📝 Final prompt:', request.prompt);
       
       // Проверяем, что промпт не пустой
       if (!request.prompt || request.prompt.trim() === '') {
         console.warn('⚠️ Empty prompt detected, generating fallback prompt');
         request.prompt = `Стильный человек в образе: ${approvedOutfit.name || 'модный образ'}. ${approvedOutfit.description || ''}`;
+        console.log('📝 Fallback prompt:', request.prompt);
       }
       
       const result = await imageGenerationService.generateImage(request);
