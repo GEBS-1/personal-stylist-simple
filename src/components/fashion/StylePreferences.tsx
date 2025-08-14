@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import { Palette, Shirt, DollarSign, ChevronRight, User, Ruler, Scale } from "lucide-react";
+import { Palette, Shirt, DollarSign, ChevronRight, User, Ruler, Scale, Check } from "lucide-react";
 import { BodyData } from "./ManualBodyInput";
 
 interface StylePreferencesProps {
@@ -116,8 +116,8 @@ export const StylePreferences = ({ analysisData, onComplete }: StylePreferencesP
             </div>
           )}
 
-          {/* Кнопка продолжения */}
-          <div className="flex justify-center pt-4">
+          {/* Кнопки */}
+          <div className="flex justify-center gap-4 pt-4">
             <Button 
               onClick={() => {
                 // Определяем occasion на основе выбранных стилей
@@ -137,14 +137,27 @@ export const StylePreferences = ({ analysisData, onComplete }: StylePreferencesP
                 
                 toast({
                   title: "Предпочтения сохранены",
-                  description: "Переходим к генерации образов",
+                  description: "Предпочтения сохранены. Теперь вы можете перейти к генерации образов.",
                 });
                 onComplete?.(preferences);
               }}
               disabled={selectedStyles.length === 0 || selectedColors.length === 0}
               className="px-8"
             >
-              Продолжить к генерации образов
+              Сохранить предпочтения
+              <Check className="w-4 h-4 ml-2" />
+            </Button>
+            
+            <Button 
+              onClick={() => {
+                // Переходим к следующему этапу
+                const event = new CustomEvent('stepChange', { detail: 'outfits' });
+                window.dispatchEvent(event);
+              }}
+              variant="outline"
+              className="px-8"
+            >
+              Перейти к генерации образов
               <ChevronRight className="w-4 h-4 ml-2" />
             </Button>
           </div>

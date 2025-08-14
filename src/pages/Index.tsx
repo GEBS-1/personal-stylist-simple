@@ -34,6 +34,19 @@ const Index = () => {
   useEffect(() => {
     // Логируем конфигурацию при загрузке
     logConfig();
+    
+    // Добавляем обработчик для перехода между этапами
+    const handleStepChangeEvent = (event: CustomEvent) => {
+      if (event.detail === 'outfits') {
+        setActiveStep('outfits');
+      }
+    };
+    
+    window.addEventListener('stepChange', handleStepChangeEvent as EventListener);
+    
+    return () => {
+      window.removeEventListener('stepChange', handleStepChangeEvent as EventListener);
+    };
   }, []);
 
   const handleStepComplete = (stepId: string, data?: any) => {
@@ -44,7 +57,7 @@ const Index = () => {
     } else if (stepId === 'preferences' && data) {
       // Сохраняем данные о стилевых предпочтениях
       setAnalysisData(prev => prev ? { ...prev, ...data } : data);
-      setActiveStep('outfits');
+      // УБИРАЕМ автоматический переход - пользователь сам выберет когда переходить
     } else if (stepId === 'outfits') {
       setActiveStep('catalog');
     }
