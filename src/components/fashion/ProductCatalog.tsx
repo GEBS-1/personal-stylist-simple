@@ -33,13 +33,14 @@ export default function ProductCatalog({ analysisData, generatedOutfit }: Produc
       const params: SearchParams = {
         query: 'outfit-based',
         bodyType: analysisData.bodyType,
-        occasion: 'casual',
+        occasion: generatedOutfit.occasion || 'casual',
         budget: 'medium',
         gender: analysisData.gender
       };
 
+      console.log('🔍 Search params:', params);
       console.log('🎨 Loading products for generated outfit:', generatedOutfit.name);
-      const outfitProducts = await wildberriesService.getRecommendations(params, generatedOutfit);
+              const outfitProducts = await wildberriesService.getRecommendations(generatedOutfit, params);
       setProducts(outfitProducts);
       
       if (outfitProducts.length > 0) {

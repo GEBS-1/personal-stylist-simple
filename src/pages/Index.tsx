@@ -41,7 +41,9 @@ const Index = () => {
     
     if (stepId === 'analysis' && data) {
       setAnalysisData(data);
-    } else if (stepId === 'preferences') {
+    } else if (stepId === 'preferences' && data) {
+      // Сохраняем данные о стилевых предпочтениях
+      setAnalysisData(prev => prev ? { ...prev, ...data } : data);
       setActiveStep('outfits');
     } else if (stepId === 'outfits') {
       setActiveStep('catalog');

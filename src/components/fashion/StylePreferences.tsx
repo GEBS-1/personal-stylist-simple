@@ -8,7 +8,14 @@ import { BodyData } from "./ManualBodyInput";
 
 interface StylePreferencesProps {
   analysisData?: BodyData;
-  onComplete?: () => void;
+  onComplete?: (preferences: StylePreferencesData) => void;
+}
+
+interface StylePreferencesData {
+  bodyType: string;
+  occasion: string;
+  budget: string;
+  gender: 'male' | 'female';
 }
 
 export const StylePreferences = ({ analysisData, onComplete }: StylePreferencesProps) => {
@@ -113,11 +120,26 @@ export const StylePreferences = ({ analysisData, onComplete }: StylePreferencesP
           <div className="flex justify-center pt-4">
             <Button 
               onClick={() => {
+                // Определяем occasion на основе выбранных стилей
+                let occasion = 'casual';
+                if (selectedStyles.includes('Классический')) occasion = 'business';
+                if (selectedStyles.includes('Спортивный')) occasion = 'sport';
+                
+                // Определяем бюджет (пока используем "Любой")
+                const budget = 'Любой';
+                
+                const preferences: StylePreferencesData = {
+                  bodyType: analysisData?.bodyType || 'rectangle',
+                  occasion,
+                  budget,
+                  gender: analysisData?.gender || 'female'
+                };
+                
                 toast({
                   title: "Предпочтения сохранены",
                   description: "Переходим к генерации образов",
                 });
-                onComplete?.();
+                onComplete?.(preferences);
               }}
               disabled={selectedStyles.length === 0 || selectedColors.length === 0}
               className="px-8"

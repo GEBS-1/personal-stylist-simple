@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, RefreshCw, CheckCircle, AlertCircle, Info } from 'lucide-react';
 import { aiService } from '@/services/aiService';
 import { wildberriesService } from '@/services/wildberriesService';
+import { OutfitDisplay } from './OutfitDisplay';
 
 interface OutfitGeneratorProps {
   analysisData: any;
@@ -12,7 +13,7 @@ interface OutfitGeneratorProps {
 }
 
 export const OutfitGenerator: React.FC<OutfitGeneratorProps> = ({ analysisData, onComplete }) => {
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(true); // Начинаем с генерации
   const [generatedOutfit, setGeneratedOutfit] = useState<any>(null);
   const [currentProvider, setCurrentProvider] = useState<string>('simulation');
   const [systemStatus, setSystemStatus] = useState<{
@@ -25,6 +26,8 @@ export const OutfitGenerator: React.FC<OutfitGeneratorProps> = ({ analysisData, 
 
   useEffect(() => {
     checkSystemStatus();
+    // Автоматически генерируем образ при загрузке компонента
+    generateOutfit();
   }, []);
 
   const checkSystemStatus = async () => {
@@ -76,13 +79,33 @@ export const OutfitGenerator: React.FC<OutfitGeneratorProps> = ({ analysisData, 
       
       const outfit = await aiService.generateOutfit(outfitRequest);
       setGeneratedOutfit(outfit);
-      onComplete(outfit);
+      // УБИРАЕМ onComplete(outfit) - пользователь должен сначала одобрить образ
       setCurrentProvider(await aiService.getCurrentProvider());
     } catch (error) {
       console.error('Error generating outfit:', error);
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleOutfitEdit = (editedOutfit: any) => {
+    setGeneratedOutfit(editedOutfit);
+    // НЕ вызываем onComplete здесь - пользователь еще не одобрил образ
+  };
+
+  const handleSearchProducts = () => {
+    // Только после одобрения образа переходим к поиску товаров
+    onComplete(generatedOutfit);
+  };
+
+  const handleRegenerate = () => {
+    setGeneratedOutfit(null);
+    generateOutfit();
+  };
+
+  const handleApproveOutfit = () => {
+    // Пользователь одобрил образ - переходим к поиску товаров
+    onComplete(generatedOutfit);
   };
 
   const getStatusIcon = (status: string) => {
@@ -103,148 +126,112 @@ export const OutfitGenerator: React.FC<OutfitGeneratorProps> = ({ analysisData, 
     }
   };
 
-  return (
-    <div className="space-y-4">
-      {/* Системный статус */}
-      <Card className="bg-gray-50">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <RefreshCw className="w-4 h-4" />
-            Статус системы
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={checkSystemStatus}
-              className="ml-auto h-6 w-6 p-0"
-            >
-              <RefreshCw className="w-3 h-3" />
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="flex gap-4 text-xs">
-            <div className="flex items-center gap-2">
-              {getStatusIcon(systemStatus.ai)}
-              <span>ИИ: {getStatusText(systemStatus.ai)}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              {getStatusIcon(systemStatus.products)}
-              <span>Товары: {getStatusText(systemStatus.products)}</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Уведомление о демо-режиме */}
-      {currentProvider === 'simulation' && (
-        <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg mb-4">
-          <p className="text-sm text-blue-700 mb-2 font-medium">
-            🎭 Демо-режим активен
+  // Если образ уже сгенерирован, показываем его для одобрения
+  if (generatedOutfit) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-2">Ваш персональный образ готов!</h2>
+          <p className="text-gray-600 mb-4">
+            ИИ создал образ специально для вас на основе ваших данных. 
           </p>
-          <p className="text-xs text-blue-600 mb-2">
-            {currentProvider === 'simulation' && (
-              <>
-                <span className="font-medium">Причина:</span> Gemini API превысил лимиты запросов (429 ошибка)
-              </>
-            )}
-          </p>
-          <p className="text-xs text-blue-500 mb-2">
-            Образы создаются на основе ваших данных с помощью симуляции
-          </p>
-          <div className="text-xs text-blue-400">
-            <p>💡 Для использования реального ИИ:</p>
-            <ul className="list-disc list-inside mt-1 space-y-1">
-              <li>Проверьте лимиты в Google AI Studio</li>
-              <li>Подождите некоторое время</li>
-              <li>Используйте другой API ключ</li>
-            </ul>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <h3 className="font-semibold text-blue-800 mb-2">Что дальше?</h3>
+            <ol className="text-left text-blue-700 space-y-1">
+              <li>1. Просмотрите созданный образ ниже</li>
+              <li>2. При необходимости отредактируйте детали</li>
+              <li>3. Нажмите "Одобрить образ" когда будете довольны результатом</li>
+              <li>4. После одобрения мы найдем товары для вашего образа</li>
+            </ol>
           </div>
         </div>
-      )}
+        
+        <OutfitDisplay
+          outfit={generatedOutfit}
+          onEdit={handleOutfitEdit}
+          onApprove={handleApproveOutfit}
+          onRegenerate={handleRegenerate}
+        />
+      </div>
+    );
+  }
 
-      {/* Основной контент */}
+  // Показываем процесс генерации
+  return (
+    <div className="space-y-6">
+      {/* Заголовок */}
+      <div className="text-center">
+        <h2 className="text-2xl font-bold mb-2">Создание вашего образа</h2>
+        <p className="text-gray-600">
+          ИИ анализирует ваши данные и создает персональный образ...
+        </p>
+      </div>
+
+      {/* Статус системы */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <span>Генерация образа</span>
-            {currentProvider !== 'simulation' && (
-              <Badge variant="secondary" className="text-xs">
-                {currentProvider === 'gemini' ? 'Gemini AI' : currentProvider}
-              </Badge>
-            )}
-          </CardTitle>
+          <CardTitle className="text-lg">Статус системы</CardTitle>
         </CardHeader>
-        <CardContent>
-          {!generatedOutfit ? (
-            <div className="text-center">
-              <p className="text-sm text-gray-600 mb-4">
-                Нажмите кнопку ниже, чтобы сгенерировать персональный образ на основе ваших данных
-              </p>
-              <Button 
-                onClick={generateOutfit} 
-                disabled={isGenerating}
-                className="min-w-48"
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Генерация образа...
-                  </>
-                ) : (
-                  'Сгенерировать образ'
-                )}
-              </Button>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div className="flex items-center gap-3">
+              {getStatusIcon(systemStatus.ai)}
+              <span className="font-medium">AI сервис</span>
             </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <h3 className="font-medium text-green-800 mb-2">{generatedOutfit.name}</h3>
-                <p className="text-sm text-green-700 mb-3">{generatedOutfit.description}</p>
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="outline" className="text-xs">
-                    {generatedOutfit.occasion}
-                  </Badge>
-                  <Badge variant="outline" className="text-xs">
-                    {generatedOutfit.season}
-                  </Badge>
-                  <Badge variant="outline" className="text-xs">
-                    {generatedOutfit.totalPrice}
-                  </Badge>
-                </div>
-              </div>
-              
-              <div>
-                <h4 className="font-medium mb-2">Элементы образа:</h4>
-                <div className="space-y-2">
-                  {generatedOutfit.items.map((item: any, index: number) => (
-                    <div key={index} className="flex items-center gap-2 text-sm">
-                      <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                      <span className="font-medium">{item.category}:</span>
-                      <span>{item.name}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              
-              <Button 
-                onClick={generateOutfit} 
-                disabled={isGenerating}
-                variant="outline"
-                className="w-full"
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Генерация нового образа...
-                  </>
-                ) : (
-                  'Сгенерировать новый образ'
-                )}
-              </Button>
+            <Badge variant={systemStatus.ai === 'available' ? 'default' : 'secondary'}>
+              {getStatusText(systemStatus.ai)}
+            </Badge>
+          </div>
+          
+          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div className="flex items-center gap-3">
+              {getStatusIcon(systemStatus.products)}
+              <span className="font-medium">Поиск товаров</span>
             </div>
-          )}
+            <Badge variant={systemStatus.products === 'available' ? 'default' : 'secondary'}>
+              {getStatusText(systemStatus.products)}
+            </Badge>
+          </div>
         </CardContent>
       </Card>
+
+      {/* Информация о пользователе */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Ваши данные для генерации</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <span className="text-sm text-gray-500">Пол:</span>
+              <p className="font-medium">{analysisData?.gender === 'female' ? 'Женский' : 'Мужской'}</p>
+            </div>
+            <div>
+              <span className="text-sm text-gray-500">Тип фигуры:</span>
+              <p className="font-medium">{analysisData?.bodyType || 'Не указан'}</p>
+            </div>
+            <div>
+              <span className="text-sm text-gray-500">Рост:</span>
+              <p className="font-medium">{analysisData?.height || 'Не указан'} см</p>
+            </div>
+            <div>
+              <span className="text-sm text-gray-500">Стиль:</span>
+              <p className="font-medium">{analysisData?.stylePreferences?.join(', ') || 'Не указан'}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Индикатор генерации */}
+      <div className="text-center">
+        <div className="inline-flex items-center gap-3 p-6 bg-blue-50 rounded-lg">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          <div>
+            <h3 className="font-semibold text-blue-800">Генерируем образ...</h3>
+            <p className="text-sm text-blue-600">Это может занять несколько секунд</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

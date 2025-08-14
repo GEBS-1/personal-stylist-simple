@@ -105,8 +105,10 @@ class WildberriesService {
   }
 
   private async searchWithMainAPI(params: SearchParams): Promise<Product[]> {
-    const searchQuery = this.buildSearchQuery(params);
+    // Use the query already present in params, which should be the specific item query
+    const searchQuery = params.query; // FIX: Use params.query directly
     console.log(`🔍 Searching via proxy with query: "${searchQuery}"`);
+    console.log(`🔍 Original params:`, { query: params.query, gender: params.gender, bodyType: params.bodyType, occasion: params.occasion });
     
     try {
       // Используем наш прокси сервер
@@ -487,246 +489,8 @@ class WildberriesService {
     const category = this.detectCategory(query);
     console.log('📂 Detected category:', category);
     
-    // База товаров по ключевым словам
-    const productDatabase = {
-      'рубашка': [
-        {
-          id: 'shirt_1',
-          name: 'Льняная рубашка',
-          price: 3500,
-          originalPrice: 4500,
-          discount: 22,
-          rating: 4.5,
-          reviews: 128,
-          image: '/placeholder.svg',
-          url: 'https://www.wildberries.ru/catalog/search?text=рубашка+льняная',
-          marketplace: 'wildberries' as const,
-          category: 'рубашка',
-          colors: ['темно-серый', 'белый', 'голубой'],
-          sizes: ['S', 'M', 'L', 'XL']
-        },
-        {
-          id: 'shirt_2',
-          name: 'Хлопковая рубашка',
-          price: 2800,
-          originalPrice: 3500,
-          discount: 20,
-          rating: 4.3,
-          reviews: 89,
-          image: '/placeholder.svg',
-          url: 'https://www.wildberries.ru/catalog/search?text=рубашка+хлопковая',
-          marketplace: 'wildberries' as const,
-          category: 'рубашка',
-          colors: ['белый', 'голубой', 'розовый'],
-          sizes: ['S', 'M', 'L', 'XL']
-        }
-      ],
-      'брюки': [
-        {
-          id: 'pants_1',
-          name: 'Хлопковые брюки чинос',
-          price: 4000,
-          originalPrice: 5000,
-          discount: 20,
-          rating: 4.3,
-          reviews: 95,
-          image: '/placeholder.svg',
-          url: 'https://www.wildberries.ru/catalog/search?text=брюки+чинос+хлопковые',
-          marketplace: 'wildberries' as const,
-          category: 'брюки',
-          colors: ['бежевый', 'темно-синий', 'серый'],
-          sizes: ['S', 'M', 'L', 'XL']
-        },
-        {
-          id: 'pants_2',
-          name: 'Джинсы прямого кроя',
-          price: 3200,
-          originalPrice: 4000,
-          discount: 20,
-          rating: 4.4,
-          reviews: 156,
-          image: '/placeholder.svg',
-          url: 'https://www.wildberries.ru/catalog/search?text=джинсы+прямые',
-          marketplace: 'wildberries' as const,
-          category: 'брюки',
-          colors: ['синий', 'темно-синий', 'черный'],
-          sizes: ['S', 'M', 'L', 'XL']
-        }
-      ],
-      'футболка': [
-        {
-          id: 'tshirt_1',
-          name: 'Хлопковая футболка',
-          price: 1500,
-          originalPrice: 2000,
-          discount: 25,
-          rating: 4.2,
-          reviews: 67,
-          image: '/placeholder.svg',
-          url: 'https://www.wildberries.ru/catalog/search?text=футболка+хлопковая',
-          marketplace: 'wildberries' as const,
-          category: 'футболка',
-          colors: ['белый', 'черный', 'серый'],
-          sizes: ['S', 'M', 'L', 'XL']
-        },
-        {
-          id: 'tshirt_2',
-          name: 'Футболка с принтом',
-          price: 1200,
-          originalPrice: 1800,
-          discount: 33,
-          rating: 4.1,
-          reviews: 45,
-          image: '/placeholder.svg',
-          url: 'https://www.wildberries.ru/catalog/search?text=футболка+принт',
-          marketplace: 'wildberries' as const,
-          category: 'футболка',
-          colors: ['белый', 'черный', 'красный'],
-          sizes: ['S', 'M', 'L', 'XL']
-        }
-      ],
-      'джинсы': [
-        {
-          id: 'jeans_1',
-          name: 'Джинсы классические',
-          price: 3000,
-          originalPrice: 4000,
-          discount: 25,
-          rating: 4.4,
-          reviews: 156,
-          image: '/placeholder.svg',
-          url: 'https://www.wildberries.ru/catalog/search?text=джинсы+классические',
-          marketplace: 'wildberries' as const,
-          category: 'джинсы',
-          colors: ['синий', 'темно-синий', 'черный'],
-          sizes: ['S', 'M', 'L', 'XL']
-        },
-        {
-          id: 'jeans_2',
-          name: 'Джинсы зауженные',
-          price: 2800,
-          originalPrice: 3500,
-          discount: 20,
-          rating: 4.2,
-          reviews: 98,
-          image: '/placeholder.svg',
-          url: 'https://www.wildberries.ru/catalog/search?text=джинсы+зауженные',
-          marketplace: 'wildberries' as const,
-          category: 'джинсы',
-          colors: ['синий', 'черный', 'серый'],
-          sizes: ['S', 'M', 'L', 'XL']
-        }
-      ],
-      'платье': [
-        {
-          id: 'dress_1',
-          name: 'Платье-миди',
-          price: 4500,
-          originalPrice: 6000,
-          discount: 25,
-          rating: 4.6,
-          reviews: 234,
-          image: '/placeholder.svg',
-          url: 'https://www.wildberries.ru/catalog/search?text=платье+миди',
-          marketplace: 'wildberries' as const,
-          category: 'платье',
-          colors: ['черный', 'синий', 'красный'],
-          sizes: ['S', 'M', 'L', 'XL']
-        },
-        {
-          id: 'dress_2',
-          name: 'Платье-футляр',
-          price: 3800,
-          originalPrice: 4800,
-          discount: 21,
-          rating: 4.4,
-          reviews: 167,
-          image: '/placeholder.svg',
-          url: 'https://www.wildberries.ru/catalog/search?text=платье+футляр',
-          marketplace: 'wildberries' as const,
-          category: 'платье',
-          colors: ['черный', 'серый', 'бежевый'],
-          sizes: ['S', 'M', 'L', 'XL']
-        }
-      ],
-      'кроссовки': [
-        {
-          id: 'sneakers_1',
-          name: 'Кроссовки спортивные',
-          price: 2500,
-          originalPrice: 3500,
-          discount: 29,
-          rating: 4.3,
-          reviews: 89,
-          image: '/placeholder.svg',
-          url: 'https://www.wildberries.ru/catalog/search?text=кроссовки+спортивные',
-          marketplace: 'wildberries' as const,
-          category: 'кроссовки',
-          colors: ['белый', 'черный', 'серый'],
-          sizes: ['36', '37', '38', '39', '40', '41', '42']
-        },
-        {
-          id: 'sneakers_2',
-          name: 'Кроссовки повседневные',
-          price: 2200,
-          originalPrice: 3000,
-          discount: 27,
-          rating: 4.2,
-          reviews: 76,
-          image: '/placeholder.svg',
-          url: 'https://www.wildberries.ru/catalog/search?text=кроссовки+повседневные',
-          marketplace: 'wildberries' as const,
-          category: 'кроссовки',
-          colors: ['белый', 'черный', 'синий'],
-          sizes: ['36', '37', '38', '39', '40', '41', '42']
-        }
-      ],
-      'костюм': [
-        {
-          id: 'suit_1',
-          name: 'Костюм классический',
-          price: 8500,
-          originalPrice: 12000,
-          discount: 29,
-          rating: 4.7,
-          reviews: 45,
-          image: '/placeholder.svg',
-          url: 'https://www.wildberries.ru/catalog/search?text=костюм+классический',
-          marketplace: 'wildberries' as const,
-          category: 'костюм',
-          colors: ['темно-синий', 'серый', 'черный'],
-          sizes: ['S', 'M', 'L', 'XL']
-        }
-      ]
-    };
-
-    // Ищем товары по категории
-    const categoryProducts = productDatabase[category as keyof typeof productDatabase];
-    
-    if (categoryProducts && categoryProducts.length > 0) {
-      console.log(`✅ Found ${categoryProducts.length} products for category: ${category}`);
-      return categoryProducts;
-    }
-
-    // Если категория не найдена, возвращаем товары по умолчанию
-    console.log('📦 Category not found, returning default products');
-    return [
-      {
-        id: 'default_1',
-        name: 'Базовый товар',
-        price: 2000,
-        originalPrice: 2500,
-        discount: 20,
-        rating: 4.0,
-        reviews: 50,
-        image: '/placeholder.svg',
-        url: 'https://www.wildberries.ru/catalog/search?text=базовый+товар',
-        marketplace: 'wildberries' as const,
-        category: 'базовый',
-        colors: ['черный', 'белый'],
-        sizes: ['S', 'M', 'L']
-      }
-    ];
+    // Используем улучшенную базу товаров
+    return this.getFallbackProductsForCategory(category, params);
   }
 
   private buildSearchQuery(params: SearchParams): string {
@@ -773,29 +537,67 @@ class WildberriesService {
   private buildSpecificSearchQuery(item: any, params: SearchParams): string {
     const { gender } = params;
     
-    // Начинаем с названия предмета
-    let searchQuery = item.name || item.category;
+    // Начинаем с пола для более точного поиска
+    let searchQuery = '';
+    if (gender === 'female') {
+      searchQuery += 'женская ';
+      
+      // Добавляем специфичные женские ключевые слова для категории
+      if (item.category === 'Верх') {
+        searchQuery += 'блуза рубашка топ ';
+      } else if (item.category === 'Низ') {
+        searchQuery += 'юбка брюки джинсы ';
+      } else if (item.category === 'Обувь') {
+        searchQuery += 'туфли босоножки балетки кроссовки ';
+      } else if (item.category === 'Аксессуары') {
+        searchQuery += 'сумка украшения шарф ';
+      } else if (item.category === 'Дополнительно') {
+        searchQuery += 'пальто куртка кардиган ';
+      }
+    } else {
+      searchQuery += 'мужская ';
+      
+      // Добавляем специфичные мужские ключевые слова для категории
+      if (item.category === 'Верх') {
+        searchQuery += 'рубашка футболка свитер ';
+      } else if (item.category === 'Низ') {
+        searchQuery += 'брюки джинсы шорты ';
+      } else if (item.category === 'Обувь') {
+        searchQuery += 'туфли ботинки кроссовки ';
+      } else if (item.category === 'Аксессуары') {
+        searchQuery += 'часы галстук кепка ';
+      } else if (item.category === 'Дополнительно') {
+        searchQuery += 'пальто куртка пиджак ';
+      }
+    }
+    
+    // Добавляем название предмета (основной поисковый термин)
+    if (item.name) {
+      // Извлекаем ключевые слова из названия
+      const nameKeywords = item.name.toLowerCase()
+        .match(/(рубашка|блуза|брюки|джинсы|юбка|футболка|топ|платье|пальто|куртка|кардиган|пиджак|туфли|ботинки|кроссовки|босоножки|балетки|сумка|очки|шарф|часы|галстук|кепка)/g);
+      
+      if (nameKeywords) {
+        searchQuery += `${nameKeywords.join(' ')} `;
+      } else {
+        // Если ключевые слова не найдены, добавляем название как есть
+        searchQuery += `${item.name} `;
+      }
+    }
     
     // Добавляем цвета, если есть
     if (item.colors && item.colors.length > 0) {
-      searchQuery += ` ${item.colors.join(' ')}`;
+      searchQuery += `${item.colors.join(' ')} `;
     }
     
     // Добавляем стиль, если есть
     if (item.style) {
-      searchQuery += ` ${item.style}`;
+      searchQuery += `${item.style} `;
     }
     
-    // Добавляем посадку, если есть
-    if (item.fit && item.fit !== 'Универсальный') {
-      searchQuery += ` ${item.fit}`;
-    }
-    
-    // Добавляем гендерные ключевые слова
-    if (gender === 'female') {
-      searchQuery += ' женская';
-    } else {
-      searchQuery += ' мужская';
+    // Добавляем посадку, если есть и она не универсальная
+    if (item.fit && item.fit !== 'Универсальный' && item.fit !== 'стандартный') {
+      searchQuery += `${item.fit} `;
     }
     
     // Добавляем материал, если есть в описании
@@ -803,8 +605,67 @@ class WildberriesService {
     const description = item.description?.toLowerCase() || '';
     for (const material of materials) {
       if (description.includes(material)) {
-        searchQuery += ` ${material}`;
+        searchQuery += `${material} `;
         break;
+      }
+    }
+    
+    // Очищаем и возвращаем запрос
+    const finalQuery = searchQuery.trim().replace(/\s+/g, ' ');
+    console.log(`🔍 Final search query for ${item.category}: "${finalQuery}"`);
+    console.log(`🔍 Item details:`, { name: item.name, colors: item.colors, style: item.style, fit: item.fit });
+    return finalQuery;
+  }
+
+  private buildOutfitSearchQuery(outfit: any, params: SearchParams): string {
+    const { gender, occasion } = params;
+    
+    // Создаем запрос для поиска похожих образов
+    let searchQuery = '';
+    
+    // Начинаем с пола
+    if (gender === 'female') {
+      searchQuery += 'женский ';
+    } else {
+      searchQuery += 'мужской ';
+    }
+    
+    // Добавляем стиль и повод
+    if (outfit.styleNotes) {
+      // Извлекаем ключевые слова из styleNotes
+      const styleKeywords = outfit.styleNotes.toLowerCase()
+        .match(/(casual|деловой|вечерний|спортивный|классический|элегантный|стильный)/g);
+      if (styleKeywords) {
+        searchQuery += `${styleKeywords.join(' ')} `;
+      }
+    }
+    
+    // Добавляем повод
+    if (occasion) {
+      searchQuery += `${occasion} `;
+    }
+    
+    // Добавляем сезон из самого образа
+    if (outfit.season) {
+      searchQuery += `${outfit.season} `;
+    }
+    
+    // Добавляем основные цвета образа
+    if (outfit.colorPalette && outfit.colorPalette.length > 0) {
+      searchQuery += `${outfit.colorPalette.join(' ')} `;
+    }
+    
+    // Добавляем тип фигуры
+    if (params.bodyType) {
+      searchQuery += `${params.bodyType} `;
+    }
+    
+    // Добавляем ключевые слова из названия образа
+    if (outfit.name) {
+      const nameKeywords = outfit.name.toLowerCase()
+        .match(/(образ|look|стиль|casual|деловой|вечерний|весенний|летний|осенний|зимний)/g);
+      if (nameKeywords) {
+        searchQuery += `${nameKeywords.join(' ')} `;
       }
     }
     
@@ -815,49 +676,76 @@ class WildberriesService {
   private parseProducts(rawProducts: any[], params: SearchParams): Product[] {
     console.log('🔧 Parsing real Wildberries products:', rawProducts.length);
     
-    return rawProducts.slice(0, 10).map((product, index) => {
-      // Обрабатываем реальные данные от Wildberries
-      const productId = product.id?.toString() || product.nm?.toString() || `wb_${index}`;
-      const productName = product.name || product.title || 'Товар Wildberries';
-      
-      // Цены в Wildberries хранятся в копейках
-      const price = product.salePriceU ? product.salePriceU / 100 : 
-                   product.priceU ? product.priceU / 100 : 0;
-      const originalPrice = product.priceU ? product.priceU / 100 : undefined;
-      
-      // Скидка
-      const discount = product.sale ? Math.round(product.sale) : 
-                      product.discount ? Math.round(product.discount) : undefined;
-      
-      // Рейтинг и отзывы
-      const rating = product.rating || product.avgRating || 4.0;
-      const reviews = product.feedbacks || product.reviewCount || 0;
-      
-      // URL товара
-      const productUrl = `https://www.wildberries.ru/catalog/${productId}/detail.aspx`;
-      
-      // Цвета и размеры
-      const colors = product.colors?.map((c: any) => c.name || c) || [];
-      const sizes = product.sizes?.map((s: any) => s.name || s) || [];
-      
-      console.log(`📦 Parsed product: ${productName} - ${price}₽`);
-      
-      return {
-        id: productId,
-        name: productName,
-        price,
-        originalPrice,
-        discount,
-        rating,
-        reviews,
-        image: this.getProductImage(product.id || product.nm, product.colors?.[0]?.id),
-        url: productUrl,
-        marketplace: 'wildberries' as const,
-        category: params.query,
-        colors,
-        sizes
-      };
-    });
+    const { gender } = params;
+    
+    return rawProducts.slice(0, 10)
+      .filter(product => {
+        // Фильтруем по полу на основе названия и описания товара
+        const productName = (product.name || product.title || '').toLowerCase();
+        const productDesc = (product.description || '').toLowerCase();
+        
+        // Исключаем товары с явным указанием неподходящего пола
+        if (gender === 'female') {
+          // Для женщин исключаем мужские товары
+          if (productName.includes('мужск') || productDesc.includes('мужск') ||
+              productName.includes('муж') || productDesc.includes('муж')) {
+            console.log(`🚫 Filtered out male product: ${product.name}`);
+            return false;
+          }
+        } else {
+          // Для мужчин исключаем женские товары
+          if (productName.includes('женск') || productDesc.includes('женск') ||
+              productName.includes('жен') || productDesc.includes('жен')) {
+            console.log(`🚫 Filtered out female product: ${product.name}`);
+            return false;
+          }
+        }
+        
+        return true;
+      })
+      .map((product, index) => {
+        // Обрабатываем реальные данные от Wildberries
+        const productId = product.id?.toString() || product.nm?.toString() || `wb_${index}`;
+        const productName = product.name || product.title || 'Товар Wildberries';
+        
+        // Цены в Wildberries хранятся в копейках
+        const price = product.salePriceU ? product.salePriceU / 100 : 
+                     product.priceU ? product.priceU / 100 : 0;
+        const originalPrice = product.priceU ? product.priceU / 100 : undefined;
+        
+        // Скидка
+        const discount = product.sale ? Math.round(product.sale) : 
+                        product.discount ? Math.round(product.discount) : undefined;
+        
+        // Рейтинг и отзывы
+        const rating = product.rating || product.avgRating || 4.0;
+        const reviews = product.feedbacks || product.reviewCount || 0;
+        
+        // URL товара
+        const productUrl = `https://www.wildberries.ru/catalog/${productId}/detail.aspx`;
+        
+        // Цвета и размеры
+        const colors = product.colors?.map((c: any) => c.name || c) || [];
+        const sizes = product.sizes?.map((s: any) => s.name || s) || [];
+        
+        console.log(`📦 Parsed product: ${productName} - ${price}₽`);
+        
+        return {
+          id: productId,
+          name: productName,
+          price,
+          originalPrice,
+          discount,
+          rating,
+          reviews,
+          image: this.getProductImage(product.id || product.nm, product.colors?.[0]?.id),
+          url: productUrl,
+          marketplace: 'wildberries' as const,
+          category: params.query,
+          colors,
+          sizes
+        };
+      });
   }
 
   private getProductImage(productId: number, colorId?: number): string {
@@ -1139,12 +1027,22 @@ class WildberriesService {
   private detectCategory(query: string): string {
     const lowerQuery = query.toLowerCase();
     
-    if (lowerQuery.includes('рубашка') || lowerQuery.includes('блузка')) return 'рубашка';
-    if (lowerQuery.includes('юбка')) return 'юбка';
-    if (lowerQuery.includes('брюки') || lowerQuery.includes('джинсы')) return 'брюки';
-    if (lowerQuery.includes('футболка') || lowerQuery.includes('майка')) return 'футболка';
-    if (lowerQuery.includes('кеды') || lowerQuery.includes('кроссовки') || lowerQuery.includes('обувь')) return 'обувь';
-    if (lowerQuery.includes('сумка') || lowerQuery.includes('очки') || lowerQuery.includes('аксессуары')) return 'аксессуары';
+    // Более детальное определение категорий
+    if (lowerQuery.includes('рубашка') || lowerQuery.includes('блузка') || lowerQuery.includes('блуза')) return 'рубашка';
+    if (lowerQuery.includes('юбка') || lowerQuery.includes('юбка-карандаш')) return 'юбка';
+    if (lowerQuery.includes('брюки') || lowerQuery.includes('джинсы') || lowerQuery.includes('шорты')) return 'брюки';
+    if (lowerQuery.includes('футболка') || lowerQuery.includes('майка') || lowerQuery.includes('топ')) return 'футболка';
+    if (lowerQuery.includes('платье') || lowerQuery.includes('сарафан')) return 'платье';
+    if (lowerQuery.includes('пальто') || lowerQuery.includes('куртка') || lowerQuery.includes('пиджак') || lowerQuery.includes('кардиган')) return 'верхняя одежда';
+    if (lowerQuery.includes('кеды') || lowerQuery.includes('кроссовки') || lowerQuery.includes('ботинки') || lowerQuery.includes('туфли') || lowerQuery.includes('обувь')) return 'обувь';
+    if (lowerQuery.includes('сумка') || lowerQuery.includes('рюкзак') || lowerQuery.includes('кошелек')) return 'сумка';
+    if (lowerQuery.includes('очки') || lowerQuery.includes('шарф') || lowerQuery.includes('шапка') || lowerQuery.includes('перчатки')) return 'аксессуары';
+    if (lowerQuery.includes('часы') || lowerQuery.includes('браслет') || lowerQuery.includes('колье')) return 'украшения';
+    
+    // Если не удалось определить, возвращаем категорию на основе контекста
+    if (lowerQuery.includes('верх') || lowerQuery.includes('верхняя')) return 'верхняя одежда';
+    if (lowerQuery.includes('низ') || lowerQuery.includes('нижняя')) return 'брюки';
+    if (lowerQuery.includes('дополнительно') || lowerQuery.includes('доп')) return 'верхняя одежда';
     
     return 'одежда';
   }
@@ -1238,15 +1136,83 @@ class WildberriesService {
           sizes: ['36', '37', '38', '39', '40', '41', '42']
         }
       ],
-      'очки': [
+      'обувь': [
         {
           id: `wb_fallback_${category}_1`,
-          name: 'Солнцезащитные очки',
-          price: 800,
-          originalPrice: 1200,
-          discount: 33,
-          rating: 4.1,
-          reviews: 45,
+          name: 'Стильная обувь',
+          price: 3800,
+          originalPrice: 5000,
+          discount: 24,
+          rating: 4.6,
+          reviews: 189,
+          image: '/placeholder.svg',
+          url: 'https://www.wildberries.ru',
+          marketplace: 'wildberries',
+          category: 'Обувь',
+          colors: ['Черный', 'Коричневый'],
+          sizes: ['36', '37', '38', '39', '40', '41', '42']
+        }
+      ],
+      'юбка': [
+        {
+          id: `wb_fallback_${category}_1`,
+          name: 'Элегантная юбка',
+          price: 2800,
+          originalPrice: 3800,
+          discount: 26,
+          rating: 4.4,
+          reviews: 95,
+          image: '/placeholder.svg',
+          url: 'https://www.wildberries.ru',
+          marketplace: 'wildberries',
+          category: 'Низ',
+          colors: ['Черный', 'Серый'],
+          sizes: ['XS', 'S', 'M', 'L']
+        }
+      ],
+      'платье': [
+        {
+          id: `wb_fallback_${category}_1`,
+          name: 'Стильное платье',
+          price: 4200,
+          originalPrice: 5500,
+          discount: 24,
+          rating: 4.5,
+          reviews: 134,
+          image: '/placeholder.svg',
+          url: 'https://www.wildberries.ru',
+          marketplace: 'wildberries',
+          category: 'Платье',
+          colors: ['Черный', 'Синий'],
+          sizes: ['XS', 'S', 'M', 'L']
+        }
+      ],
+      'верхняя одежда': [
+        {
+          id: `wb_fallback_${category}_1`,
+          name: 'Стильная верхняя одежда',
+          price: 6500,
+          originalPrice: 8500,
+          discount: 24,
+          rating: 4.6,
+          reviews: 178,
+          image: '/placeholder.svg',
+          url: 'https://www.wildberries.ru',
+          marketplace: 'wildberries',
+          category: 'Верхняя одежда',
+          colors: ['Черный', 'Бежевый'],
+          sizes: ['S', 'M', 'L', 'XL']
+        }
+      ],
+      'сумка': [
+        {
+          id: `wb_fallback_${category}_1`,
+          name: 'Стильная сумка',
+          price: 3200,
+          originalPrice: 4200,
+          discount: 24,
+          rating: 4.3,
+          reviews: 89,
           image: '/placeholder.svg',
           url: 'https://www.wildberries.ru',
           marketplace: 'wildberries',
@@ -1255,21 +1221,38 @@ class WildberriesService {
           sizes: ['Универсальный']
         }
       ],
-      'ремень': [
+      'аксессуары': [
         {
           id: `wb_fallback_${category}_1`,
-          name: 'Кожаный ремень',
-          price: 600,
-          originalPrice: 900,
-          discount: 33,
-          rating: 4.0,
-          reviews: 23,
+          name: 'Модный аксессуар',
+          price: 1800,
+          originalPrice: 2500,
+          discount: 28,
+          rating: 4.2,
+          reviews: 67,
           image: '/placeholder.svg',
           url: 'https://www.wildberries.ru',
           marketplace: 'wildberries',
           category: 'Аксессуары',
-          colors: ['Коричневый', 'Черный'],
-          sizes: ['S', 'M', 'L']
+          colors: ['Черный', 'Серебряный'],
+          sizes: ['Универсальный']
+        }
+      ],
+      'украшения': [
+        {
+          id: `wb_fallback_${category}_1`,
+          name: 'Элегантное украшение',
+          price: 2200,
+          originalPrice: 3000,
+          discount: 27,
+          rating: 4.4,
+          reviews: 78,
+          image: '/placeholder.svg',
+          url: 'https://www.wildberries.ru',
+          marketplace: 'wildberries',
+          category: 'Украшения',
+          colors: ['Серебряный', 'Золотой'],
+          sizes: ['Универсальный']
         }
       ]
     };
@@ -1293,102 +1276,85 @@ class WildberriesService {
     ];
   }
 
-  async getRecommendations(params: SearchParams, generatedOutfit?: any): Promise<Product[]> {
-    const { bodyType, occasion, budget, gender } = params;
-    
-    console.log('🎯 Starting product search for outfit:', { bodyType, occasion, gender });
-    
+  async getRecommendations(generatedOutfit: any, params: SearchParams): Promise<Product[]> {
+    console.log('🎯 Starting product recommendations for outfit:', generatedOutfit?.name);
+    console.log('🎯 Outfit items:', generatedOutfit?.items?.map((item: any) => ({ 
+      category: item.category, 
+      name: item.name 
+    })));
+
+    if (!generatedOutfit?.items?.length) {
+      console.log('❌ No outfit items found');
+      return [];
+    }
+
     const allProducts: Product[] = [];
-    
-    // Если у нас есть сгенерированный образ, ищем реальные товары для каждого элемента
-    if (generatedOutfit && generatedOutfit.items && generatedOutfit.items.length > 0) {
-      console.log('🎨 Searching real products for generated outfit:', generatedOutfit.name);
+
+    // Ищем товары для каждого элемента образа отдельно
+    for (const item of generatedOutfit.items) {
+      console.log(`\n🔍 Searching for item: "${item.name}" (${item.category})`);
       
-      for (const item of generatedOutfit.items) {
-        console.log(`🔍 Searching real products for outfit item: ${item.name}`);
+      try {
+        // Ищем товары для конкретного элемента
+        const itemProducts = await this.searchProducts({
+          query: item.name,
+          gender: params.gender,
+          bodyType: params.bodyType,
+          occasion: params.occasion,
+          budget: params.budget,
+          limit: 1 // Берем только 1 товар для каждого элемента
+        });
+
+        console.log(`✅ Found ${itemProducts.length} products for "${item.name}"`);
         
-        try {
-          // Создаем поисковый запрос на основе элемента образа
-          const searchQuery = this.buildSpecificSearchQuery(item, params);
-          console.log(`📝 Search query: "${searchQuery}"`);
-          
-          // Ищем реальные товары
-          const realProducts = await this.searchProducts({
-            ...params,
-            query: searchQuery,
-            limit: 2
+        if (itemProducts.length > 0) {
+          // Берем только первый (наиболее релевантный) товар
+          const selectedProduct = itemProducts[0];
+          console.log(`📦 Selected product:`, { 
+            name: selectedProduct.name, 
+            category: selectedProduct.category, 
+            price: selectedProduct.price 
           });
           
-          if (realProducts && realProducts.length > 0) {
-            console.log(`✅ Found ${realProducts.length} real products for "${item.name}"`);
-            allProducts.push(...realProducts);
-          } else {
-            console.log(`⚠️ No real products found for "${item.name}", creating simulated product`);
-            // Если реальных товаров нет, создаем симулированный
-            const simulatedProduct = this.createProductFromOutfitItem(item, params);
-            if (simulatedProduct) {
-              allProducts.push(simulatedProduct);
-            }
-          }
-        } catch (error) {
-          console.log(`❌ Failed to search for "${item.name}":`, error);
-          // Создаем симулированный товар в случае ошибки
+          allProducts.push(selectedProduct);
+        } else {
+          // Если товары не найдены, создаем симулированный
+          console.log(`🎨 No products found, creating simulated product for "${item.name}"`);
           const simulatedProduct = this.createProductFromOutfitItem(item, params);
-          if (simulatedProduct) {
-            allProducts.push(simulatedProduct);
-          }
-        }
-      }
-    } else {
-      // Если нет сгенерированного образа (например, Gemini недоступен), используем базовые категории
-      console.log('📋 No generated outfit available, using category-based search');
-      const categories = this.getCategoriesByParams(bodyType, occasion, gender);
-      
-      for (const category of categories) {
-        if (allProducts.length >= 9) break; // Ограничиваем количество товаров
-        
-        console.log(`🔍 Searching products for category: ${category}`);
-        try {
-          const products = await this.searchProducts({
-            ...params,
-            query: category,
-            limit: 2
+          console.log(`🎨 Created simulated product:`, { 
+            name: simulatedProduct.name, 
+            category: simulatedProduct.category, 
+            price: simulatedProduct.price 
           });
-          console.log(`✅ Found ${products.length} products for ${category}`);
-          allProducts.push(...products);
-        } catch (error) {
-          console.log(`⚠️ Failed to search for ${category}:`, error);
-          // Добавляем fallback продукты для этой категории
-          const fallbackProducts = this.getFallbackProductsForCategory(category, params);
-          allProducts.push(...fallbackProducts);
+          allProducts.push(simulatedProduct);
         }
+      } catch (error) {
+        console.error(`❌ Error searching for "${item.name}":`, error);
+        // В случае ошибки создаем симулированный товар
+        const simulatedProduct = this.createProductFromOutfitItem(item, params);
+        console.log(`🎨 Created fallback simulated product:`, { 
+          name: simulatedProduct.name, 
+          category: simulatedProduct.category, 
+          price: simulatedProduct.price 
+        });
+        allProducts.push(simulatedProduct);
       }
     }
-    
-    // Если товаров все еще недостаточно, добавляем дополнительные
-    if (allProducts.length < 3) {
-      console.log('📋 Adding additional fallback products');
-      const fallbackProducts = this.getFallbackProducts(params);
-      allProducts.push(...fallbackProducts);
-    }
-    
-    console.log(`📦 Total products found: ${allProducts.length}`);
-    
+
     // Фильтруем по бюджету
-    const filteredProducts = this.filterByBudget(allProducts, budget);
-    console.log(`💰 After budget filter: ${filteredProducts.length} products`);
+    const budgetFiltered = this.filterByBudget(allProducts, params.budget);
+    console.log(`💰 Budget filtering: ${allProducts.length} → ${budgetFiltered.length} products`);
+
+    // Ограничиваем количество товаров количеством элементов образа
+    const result = budgetFiltered.slice(0, generatedOutfit.items.length);
     
-    // Убираем дубликаты
-    const uniqueProducts = this.removeDuplicates(filteredProducts);
-    console.log(`🎯 Final unique products: ${uniqueProducts.length}`);
+    console.log(`🎯 Final products:`, result.map(p => ({ 
+      name: p.name, 
+      category: p.category, 
+      price: p.price, 
+      isSimulated: p.id.includes('outfit_') || p.id.includes('fallback') 
+    })));
     
-    const result = uniqueProducts.slice(0, 9);
-    
-    // Определяем тип результатов для логирования
-    const realCount = result.filter(p => !p.id.includes('outfit_') && !p.id.includes('fallback')).length;
-    const simulatedCount = result.length - realCount;
-    
-    console.log(`🎯 Returning ${result.length} product recommendations (${realCount} real + ${simulatedCount} simulated)`);
     return result;
   }
 
@@ -1396,32 +1362,77 @@ class WildberriesService {
     const { gender, bodyType, occasion } = params;
     
     // Создаем уникальный ID на основе элемента образа
-    const itemId = `outfit_${item.name.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`;
+    const itemId = `outfit_${item.category.toLowerCase()}_${item.name.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`;
     
-    // Определяем базовую цену в зависимости от категории
+    // Определяем базовую цену в зависимости от категории и материала
     const basePrices = {
-      'рубашка': { min: 2500, max: 4500 },
-      'брюки': { min: 3000, max: 5000 },
-      'футболка': { min: 1200, max: 2500 },
-      'джинсы': { min: 2800, max: 4500 },
-      'платье': { min: 3500, max: 6000 },
-      'кроссовки': { min: 2000, max: 4000 },
-      'костюм': { min: 7000, max: 12000 }
+      'Верх': { min: 2500, max: 4500 },
+      'Низ': { min: 3000, max: 5000 },
+      'Обувь': { min: 3500, max: 6000 },
+      'Аксессуары': { min: 1500, max: 4000 },
+      'Дополнительно': { min: 5000, max: 12000 }
     };
     
-    const category = this.detectCategory(item.name);
+    const category = item.category;
     const priceRange = basePrices[category as keyof typeof basePrices] || { min: 2000, max: 4000 };
     const price = Math.floor(Math.random() * (priceRange.max - priceRange.min + 1)) + priceRange.min;
     const originalPrice = Math.floor(price * (1 + Math.random() * 0.3 + 0.1)); // +10-40%
     const discount = Math.floor(((originalPrice - price) / originalPrice) * 100);
     
-    // Создаем URL для поиска
-    const searchQuery = encodeURIComponent(item.name);
+    // Создаем URL для поиска на основе элемента образа
+    const searchQuery = encodeURIComponent(`${item.name} ${item.colors?.[0] || ''}`);
     const url = `https://www.wildberries.ru/catalog/search?text=${searchQuery}`;
     
-    return {
+    // Определяем размеры в зависимости от категории
+    let sizes: string[];
+    if (category === 'Обувь') {
+      sizes = ['36', '37', '38', '39', '40', '41', '42'];
+    } else if (category === 'Аксессуары') {
+      sizes = ['универсальный'];
+    } else {
+      sizes = ['S', 'M', 'L', 'XL'];
+    }
+    
+    // Создаем название товара на основе элемента образа
+    let productName = item.name;
+    if (item.colors && item.colors.length > 0) {
+      productName = `${item.colors[0]} ${item.name}`;
+    }
+    
+    // Добавляем материал, если есть в описании
+    const materials = ['льняная', 'хлопковая', 'шелковая', 'шерстяная', 'кожаная'];
+    const description = item.description?.toLowerCase() || '';
+    for (const material of materials) {
+      if (description.includes(material)) {
+        productName = `${material} ${productName}`;
+        break;
+      }
+    }
+    
+    // Добавляем случайные варианты для разнообразия
+    const variants = [
+      'классическая', 'современная', 'стильная', 'элегантная', 'повседневная',
+      'офисная', 'вечерняя', 'спортивная', 'casual', 'деловая'
+    ];
+    
+    if (Math.random() > 0.5) {
+      const variant = variants[Math.floor(Math.random() * variants.length)];
+      productName = `${variant} ${productName}`;
+    }
+    
+                        console.log(`🎨 Created simulated product for ${item.category}: "${productName}"`);
+                    console.log(`🎨 Simulated product details:`, { 
+                      id: itemId, 
+                      name: productName, 
+                      price, 
+                      category: item.category,
+                      colors: item.colors || ['черный', 'белый'],
+                      sizes
+                    });
+                    
+                    return {
       id: itemId,
-      name: item.name,
+      name: productName,
       price,
       originalPrice,
       discount,
@@ -1430,9 +1441,9 @@ class WildberriesService {
       image: '/placeholder.svg',
       url,
       marketplace: 'wildberries' as const,
-      category,
-      colors: this.getColorsForCategory(category),
-      sizes: this.getSizesForCategory(category, gender)
+      category: item.category,
+      colors: item.colors || ['черный', 'белый'],
+      sizes
     };
   }
 
@@ -1489,6 +1500,11 @@ class WildberriesService {
   }
 
   private filterByBudget(products: Product[], budget: string): Product[] {
+    // Если бюджет не указан или "Любой", не фильтруем
+    if (!budget || budget === 'Любой') {
+      return products;
+    }
+    
     const budgetLimits = {
       'low': 3000,
       'medium': 8000,
